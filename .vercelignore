@@ -9,3 +9,9 @@
 /corpus
 /docs
 /.github
+
+# Local caches: Vercel does not read .gitignore, so exclude them here too.
+/__pycache__
+/*.pyc
+/.pytest_cache
+/.ruff_cache

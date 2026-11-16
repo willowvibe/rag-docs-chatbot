@@ -48,6 +48,72 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `UPSTASH_REDIS_REST_URL` | empty |
 | `UPSTASH_REDIS_REST_TOKEN` | empty |
 
+## Deploy
+
+The app runs in two lanes. **Self-host** means running it locally or in Docker with your
+own `ANTHROPIC_API_KEY`. **Hosted demo** means running it on Vercel, where the owner's key
+lives in the project's environment variables — never in the browser — and per-IP and
+per-day limits backstop it. `RATE_LIMIT_ENABLED` ships as `0`; only the demo deployment
+sets it to `1`.
+
+Prerequisites:
+
+- A Postgres database with the `vector` extension (the Neon free tier works).
+- An Upstash Redis database, for the REST URL and token that hold the limit counters.
+- This repository imported as a Vercel project.
+
+Ingest against the hosted database **before** the first request: point `DATABASE_URL` at
+it and run `make ingest`. The deployed app only reads the `chunks` table; `corpus/` and
+`eval/` are excluded from the upload by `.vercelignore`, so there is nothing to ingest
+inside the deployment.
+
+Set these in the Vercel project settings:
+
+- `ANTHROPIC_API_KEY`
+- `DATABASE_URL`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+- `RATE_LIMIT_ENABLED=1` (demo only; the shipped default is `0`)
+- `PER_IP_PER_HOUR=20`
+- `DAILY_CAP=500`
+- `FASTEMBED_CACHE_PATH=/tmp/fastembed`
+
+The first four carry deployment-specific credentials; keep them in the project settings
+and out of the repository. `FASTEMBED_CACHE_PATH` is set explicitly because the function
+filesystem is read-only apart from `/tmp`, so the model cache must live there. fastembed's
+own fallback is `/tmp/fastembed_cache`, which makes this an explicit choice rather than a
+fix for a crash.
+
+Cold starts are slow: importing the app loads the tiktoken `cl100k_base` encoding (a small
+download when the cache is cold), and the first embed downloads the BGE model into
+`/tmp`. Subsequent requests on a warm instance are fast.
+
+Vercel's FastAPI framework preset serves the app at its own paths — `/`, `/api/*` and
+`/static/*` — with no rewrites. `vercel.json` only raises `maxDuration` to 300 s, which
+leaves room for a cold start. If you ever want the `/api` file-function lane instead of
+the preset, set the project's Framework Preset to "Other". Vercel runs the Python version
+named in `.python-version` (3.12); the `Dockerfile` and CI pin 3.11, and
+`requirements.txt` installs on both.
+
+If the Python bundle exceeds Vercel's size limit, the same `Dockerfile` runs unchanged on
+Render or Fly — which is why the app contains no Vercel-specific code.
+
+To confirm the limits actually bite, run this against a deployment with
+`RATE_LIMIT_ENABLED=1`:
+
+```bash
+URL=https://<deployment>.vercel.app
+for i in $(seq 1 21); do
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST "$URL/api/chat" \
+    -H 'content-type: application/json' -H 'x-forwarded-for: 203.0.113.7' \
+    -d '{"question":"What is the minimum password length?"}'
+done | sort | uniq -c
+```
+
+Twenty requests should print `200` and the twenty-first `429`. Check that the UI shows
+the 429 message and still renders, and that the key is absent from the client:
+`curl -s "$URL/" | grep -c sk-ant` should print `0`.
+
 ## Corpus
 
 `corpus/` holds two public-domain NIST Special Publications, included unmodified so the

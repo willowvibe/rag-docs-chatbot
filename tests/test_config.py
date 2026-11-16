@@ -3,6 +3,12 @@ import pytest
 from ragchat.config import load_settings
 
 
+@pytest.fixture(autouse=True)
+def _no_dotenv(monkeypatch):
+    """Exercise the environment only: a developer's .env must not repopulate it."""
+    monkeypatch.setattr("ragchat.config.load_dotenv", lambda *args, **kwargs: None)
+
+
 def test_defaults(monkeypatch):
     for key in (
         "DATABASE_URL",
