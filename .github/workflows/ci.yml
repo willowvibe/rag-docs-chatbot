@@ -30,5 +30,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: ruff check .
       - run: pytest -q
-      - run: python -m ragchat.ingest.pipeline corpus/
+      - run: |
+          python -m ragchat.ingest.pipeline corpus/ | tee /tmp/ingest.log
+          grep -q "total=386 chunks across 2 documents" /tmp/ingest.log
       - run: python -m ragchat.eval.validate_golden eval/golden.jsonl

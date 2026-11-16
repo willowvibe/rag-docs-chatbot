@@ -36,9 +36,13 @@ eval: validate-golden
 
 demo:
 	$(COMPOSE) up -d --build
-	@until $(COMPOSE) exec -T db pg_isready -U rag -d rag >/dev/null 2>&1; do sleep 1; done
+	@for i in $$(seq 1 60); do \
+	  $(COMPOSE) exec -T db pg_isready -U rag -d rag >/dev/null 2>&1 && break; \
+	  [ $$i -eq 60 ] && echo "db never became ready; see: $(COMPOSE) logs db" && exit 1; \
+	  sleep 1; \
+	done
 	$(COMPOSE) exec -T app python -m ragchat.ingest.pipeline corpus/
-	@echo "Open http://localhost:$${APP_PORT:-8000}"
+	@echo "Open http://localhost:$$($(COMPOSE) port app 8000 | cut -d: -f2)"
 
 ask:
-	$(PYTHON) -c "import os,sys; from ragchat.embeddings import Embedder; from ragchat.store import Store; from ragchat.answer import answer; q=sys.argv[1]; e=Embedder(); s=Store(os.environ.get('DATABASE_URL','postgresql://rag:rag@localhost:5433/rag')); r=answer(q, s.search(e.embed([q])[0], k=5)); print(r.text); [print(f'  - {c.file} p.{c.page}') for c in r.citations]" "$(Q)"
+	$(PYTHON) -c "import sys; from ragchat.config import load_settings; from ragchat.embeddings import Embedder; from ragchat.store import Store; from ragchat.answer import answer; q=sys.argv[1]; s=load_settings(); e=Embedder(); st=Store(s.database_url); r=answer(q, st.search(e.embed([q])[0], k=s.top_k), model=s.model); print(r.text); [print(f'  - {c.file} p.{c.page}') for c in r.citations]" "$(Q)"

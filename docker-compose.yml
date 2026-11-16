@@ -19,6 +19,10 @@ services:
     environment:
       DATABASE_URL: postgresql://rag:rag@db:5432/rag
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-0}
+      UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL:-}
+      UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:-}
+      RAG_MODEL: ${RAG_MODEL:-claude-sonnet-5-5}
     ports:
       # Host port 8000 is used by another project on some machines; override with APP_PORT.
       - "${APP_PORT:-8000}:8000"
