@@ -1,0 +1,30 @@
+{"id": "q01", "question": "What is the minimum length for a password used as a single-factor authenticator?", "file": "corpus/nist-sp-800-63b.pdf", "page": 25, "evidence_phrase": "minimum of 15 characters in length"}
+{"id": "q02", "question": "How long must a password be when it is used only as part of multifactor authentication?", "file": "corpus/nist-sp-800-63b.pdf", "page": 25, "evidence_phrase": "of eight characters in length"}
+{"id": "q03", "question": "What composition rules may verifiers impose on passwords?", "file": "corpus/nist-sp-800-63b.pdf", "page": 25, "evidence_phrase": "SHALL NOT impose other composition rules"}
+{"id": "q04", "question": "Do verifiers require subscribers to change passwords periodically?", "file": "corpus/nist-sp-800-63b.pdf", "page": 25, "evidence_phrase": "SHALL NOT require subscribers to change passwords periodically"}
+{"id": "q05", "question": "What is the minimum length of a look-up secret?", "file": "corpus/nist-sp-800-63b.pdf", "page": 28, "evidence_phrase": "at least six decimal digits"}
+{"id": "q06", "question": "How many times can a secret from a look-up secret authenticator be used successfully?", "file": "corpus/nist-sp-800-63b.pdf", "page": 28, "evidence_phrase": "A secret from a look-up secret authenticator SHALL be used successfully"}
+{"id": "q07", "question": "Why is email prohibited for out-of-band authentication?", "file": "corpus/nist-sp-800-63b.pdf", "page": 31, "evidence_phrase": "Email SHALL NOT be used for out-of-band authentication"}
+{"id": "q08", "question": "How long does an out-of-band authentication have to complete before it is invalid?", "file": "corpus/nist-sp-800-63b.pdf", "page": 33, "evidence_phrase": "considered invalid unless completed within 10"}
+{"id": "q09", "question": "How many consecutive failed authentication attempts may a verifier allow for a specific authenticator?", "file": "corpus/nist-sp-800-63b.pdf", "page": 41, "evidence_phrase": "no more than 100 by disabling that authenticator"}
+{"id": "q10", "question": "What is the maximum overall reauthentication timeout at AAL2?", "file": "corpus/nist-sp-800-63b.pdf", "page": 18, "evidence_phrase": "no more than 24 hours at AAL2"}
+{"id": "q11", "question": "What is the recommended inactivity timeout at AAL3?", "file": "corpus/nist-sp-800-63b.pdf", "page": 20, "evidence_phrase": "no more than 15 minutes"}
+{"id": "q12", "question": "How long must session-binding secrets be?", "file": "corpus/nist-sp-800-63b.pdf", "page": 65, "evidence_phrase": "at least 64 bits in length"}
+{"id": "q13", "question": "What is session monitoring sometimes called?", "file": "corpus/nist-sp-800-63b.pdf", "page": 68, "evidence_phrase": "sometimes called continuous authentication"}
+{"id": "q14", "question": "How much entropy must a saved recovery code include?", "file": "corpus/nist-sp-800-63b.pdf", "page": 58, "evidence_phrase": "at least 64 bits from an approved"}
+{"id": "q15", "question": "What notification must occur for every account recovery event?", "file": "corpus/nist-sp-800-63b.pdf", "page": 61, "evidence_phrase": "account recovery SHALL cause a notification"}
+{"id": "q16", "question": "What false match rate must a biometric system achieve?", "file": "corpus/nist-sp-800-63b.pdf", "page": 43, "evidence_phrase": "one in 10000"}
+{"id": "q17", "question": "May biometrics be used alone as an authenticator?", "file": "corpus/nist-sp-800-63b.pdf", "page": 43, "evidence_phrase": "SHALL only be used as part of multi-factor authentication"}
+{"id": "q18", "question": "Which authenticator combinations are permitted at AAL2 when two single-factor authenticators are used?", "file": "corpus/nist-sp-800-63b.pdf", "page": 17, "evidence_phrase": "conjunction with either a password"}
+{"id": "q19", "question": "What does the Identity Assurance Level (IAL) refer to?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 13, "evidence_phrase": "refers to identity proofing functions"}
+{"id": "q20", "question": "What does the Authentication Assurance Level (AAL) refer to?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 13, "evidence_phrase": "refers to authentication functions"}
+{"id": "q21", "question": "What does the Federation Assurance Level (FAL) refer to?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 13, "evidence_phrase": "refers to federation functions"}
+{"id": "q22", "question": "What is required to achieve AAL2?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 46, "evidence_phrase": "two distinct authentication factors"}
+{"id": "q23", "question": "What kind of private key must an AAL3 authenticator use?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 46, "evidence_phrase": "a non-exportable"}
+{"id": "q24", "question": "What does IAL3 require that IAL1 and IAL2 do not?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 44, "evidence_phrase": "collection of at least one biometric"}
+{"id": "q25", "question": "What is a claimant?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 19, "evidence_phrase": "making a claim"}
+{"id": "q26", "question": "What does a verifier do?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 19, "evidence_phrase": "one or more authenticators using an authentication protocol"}
+{"id": "q27", "question": "What does the Pass Rate (Overall) metric measure?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 57, "evidence_phrase": "successfully complete identity proofing"}
+{"id": "q28", "question": "What must RPs and CSPs enable individuals to do about grievances?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 61, "evidence_phrase": "convey grievances and seek redress"}
+{"id": "q29", "question": "What must organizations do about all uses of AI/ML in the identity system?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 62, "evidence_phrase": "All uses of AI/ML SHALL be documented"}
+{"id": "q30", "question": "What functions does a credential service provider perform?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 19, "evidence_phrase": "authenticators to those accounts"}

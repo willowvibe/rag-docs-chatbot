@@ -9,9 +9,5 @@ __pycache__/
 .env
 .demo-work/
 
-# Eval output
-eval/report.json
-eval/report.md
-
 # Scratch space (progress ledgers etc.)
 .superpowers/

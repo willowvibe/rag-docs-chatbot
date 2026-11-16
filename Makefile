@@ -27,3 +27,9 @@ lint:
 
 verify-corpus:
 	sha256sum -c corpus/SHA256SUMS
+
+validate-golden:
+	$(PYTHON) -m ragchat.eval.validate_golden eval/golden.jsonl
+
+eval: validate-golden
+	$(PYTHON) -m ragchat.eval.run_eval
