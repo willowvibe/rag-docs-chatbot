@@ -23,7 +23,7 @@
 {"id": "q23", "question": "What kind of private key must an AAL3 authenticator use?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 46, "evidence_phrase": "a non-exportable"}
 {"id": "q24", "question": "What does IAL3 require that IAL1 and IAL2 do not?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 44, "evidence_phrase": "collection of at least one biometric"}
 {"id": "q25", "question": "What is a claimant?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 19, "evidence_phrase": "making a claim"}
-{"id": "q26", "question": "What does a verifier do?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 19, "evidence_phrase": "one or more authenticators using an authentication protocol"}
+{"id": "q26", "question": "What does a verifier do?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 19, "evidence_phrase": "verifier: a verifier confirms the claimant"}
 {"id": "q27", "question": "What does the Pass Rate (Overall) metric measure?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 57, "evidence_phrase": "successfully complete identity proofing"}
 {"id": "q28", "question": "What must RPs and CSPs enable individuals to do about grievances?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 61, "evidence_phrase": "convey grievances and seek redress"}
 {"id": "q29", "question": "What must organizations do about all uses of AI/ML in the identity system?", "file": "corpus/nist-sp-800-63-4.pdf", "page": 62, "evidence_phrase": "All uses of AI/ML SHALL be documented"}

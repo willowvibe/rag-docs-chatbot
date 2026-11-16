@@ -94,3 +94,14 @@ class Store:
                     "SELECT count(*) FROM chunks WHERE doc_id = %s", (doc_id,)
                 ).fetchone()[0]
             )
+
+    def count_for_file(self, name: str) -> int:
+        """Count chunks whose stored path has this basename (files may live in subdirs)."""
+        with self._connect() as conn:
+            return int(
+                conn.execute(
+                    "SELECT count(*) FROM chunks"
+                    " WHERE regexp_replace(file, '^.*/', '') = %s",
+                    (name,),
+                ).fetchone()[0]
+            )
