@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ragchat.ingest.parsers import Page, parse_document
+from ragchat.ingest.parsers import parse_document
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -11,6 +11,7 @@ def test_pdf_pages_are_numbered_from_one():
     assert [p.number for p in pages] == sorted(p.number for p in pages)
     assert all(p.file.endswith("sample.pdf") for p in pages)
     assert any("authentication" in p.text.lower() for p in pages)
+    assert [p.number for p in pages if "authentication" in p.text.lower()] == [2]
 
 
 def test_blank_page_mid_document_preserves_source_numbering(tmp_path):
@@ -51,6 +52,7 @@ def test_markdown_preamble_becomes_the_first_section(tmp_path):
     assert [p.number for p in pages] == [1, 2]
     assert "intro" in pages[0].text
     assert "alpha" in pages[1].text
+    assert "intro" not in pages[1].text
 
 
 def test_html_splits_on_h1(tmp_path):
