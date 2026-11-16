@@ -50,7 +50,7 @@ def _answer(question: str, hits, model: str):
 
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
-    k: int | None = None
+    k: int | None = Field(default=None, ge=1, le=10)
 
 
 @app.get("/api/health")
@@ -90,7 +90,8 @@ def chat(body: ChatRequest, request: Request) -> dict:
     return {
         "answer": result.text,
         "citations": [
-            {"file": c.file, "page": c.page, "snippet": c.snippet} for c in result.citations
+            {"file": c.file, "page": c.page, "snippet": c.snippet, "marker": c.marker}
+            for c in result.citations
         ],
         "model": settings.model,
         "remaining": remaining,

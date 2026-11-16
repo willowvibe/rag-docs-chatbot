@@ -27,6 +27,7 @@ class Citation:
     file: str
     page: int
     snippet: str
+    marker: int = 0
 
 
 @dataclass(frozen=True)
@@ -56,7 +57,7 @@ def parse_citations(text: str, hits: list[Hit]) -> list[Citation]:
     for n in seen:
         hit = hits[n - 1]
         snippet = hit.text[:300].strip()
-        citations.append(Citation(file=hit.file, page=hit.page, snippet=snippet))
+        citations.append(Citation(file=hit.file, page=hit.page, snippet=snippet, marker=n))
     return citations
 
 

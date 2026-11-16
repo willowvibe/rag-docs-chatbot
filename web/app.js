@@ -68,11 +68,21 @@
       return;
     }
 
-    // The server lists citations in first-appearance order of the answer's unique
-    // markers, so the nth new marker maps to the nth source card. Repeated markers
-    // reuse the same card.
-    var markerToCard = {};
-    var nextCard = 1;
+    // Each citation carries the marker the model wrote (e.g. 2 for "[2]"), so a
+    // button exists only for a marker with a matching citation and the card is
+    // found by that marker, never by ordinal position. Repeated markers reuse
+    // the same card.
+    var citedMarkers = {};
+    citations.forEach(function (citation) {
+      if (citation && citation.marker) {
+        citedMarkers[citation.marker] = true;
+      }
+    });
+
+    // Keep this answer's citations on its own node: clicking a marker on an
+    // older answer must re-render the pane from that answer's sources.
+    node._citations = citations;
+
     var markerPattern = /\[(\d{1,2})\]/g;
     var lastIndex = 0;
     var match;
@@ -83,19 +93,13 @@
       }
 
       var marker = parseInt(match[1], 10);
-      if (!markerToCard[marker] && nextCard <= citations.length) {
-        markerToCard[marker] = nextCard;
-        nextCard += 1;
-      }
-
-      var cardIndex = markerToCard[marker];
-      if (cardIndex) {
+      if (citedMarkers[marker]) {
         var button = document.createElement("button");
         button.type = "button";
         button.className = "citation";
         button.textContent = "[" + marker + "]";
-        button.setAttribute("data-target", String(cardIndex));
-        button.setAttribute("aria-label", "Jump to source " + cardIndex);
+        button.setAttribute("data-marker", String(marker));
+        button.setAttribute("aria-label", "Jump to source [" + marker + "]");
         node.appendChild(button);
       } else {
         node.appendChild(document.createTextNode(match[0]));
@@ -122,13 +126,13 @@
       return;
     }
 
-    citations.forEach(function (citation, index) {
-      var cardIndex = index + 1;
+    citations.forEach(function (citation) {
+      var marker = citation.marker;
 
       var card = document.createElement("article");
       card.className = "source-card";
-      card.id = "source-" + cardIndex;
-      card.setAttribute("data-source", String(cardIndex));
+      card.id = "source-" + marker;
+      card.setAttribute("data-marker", String(marker));
 
       var head = document.createElement("div");
       head.className = "source-head";
@@ -155,8 +159,8 @@
     });
   }
 
-  function revealSource(cardIndex) {
-    var card = document.getElementById("source-" + cardIndex);
+  function revealSource(marker) {
+    var card = sources.querySelector('[data-marker="' + marker + '"]');
     if (!card) {
       return;
     }
@@ -271,6 +275,15 @@
     if (!button) {
       return;
     }
-    revealSource(button.getAttribute("data-target"));
+    // Resolve the card through this specific answer's citations, never through
+    // whatever answer happens to own the sources pane right now.
+    var message = button.closest(".message.answer");
+    var citations = message && message._citations ? message._citations : [];
+    var marker = button.getAttribute("data-marker");
+    if (!citations.length || !marker) {
+      return;
+    }
+    renderSources(citations);
+    revealSource(marker);
   });
 })();

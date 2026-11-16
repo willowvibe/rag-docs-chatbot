@@ -17,6 +17,11 @@ class FakeStore:
 
 
 def _client(monkeypatch, reply="At least 8 characters [1]."):
+    # Only the tests that reach the chat route need a key; patch the accessor so the
+    # value is deterministic even when a developer `.env` has a real key.
+    monkeypatch.setattr(
+        api, "_settings", lambda: replace(load_settings(), anthropic_api_key="sk-test")
+    )
     monkeypatch.setattr(api, "_store", lambda: FakeStore())
     monkeypatch.setattr(api, "_embedder", lambda: type("E", (), {"embed": lambda self, t: [[0.0] * 384]})())
     monkeypatch.setattr(
@@ -24,7 +29,9 @@ def _client(monkeypatch, reply="At least 8 characters [1]."):
         "_answer",
         lambda q, hits, model: Answer(
             text=reply,
-            citations=[Citation(file="a.pdf", page=3, snippet="eight characters")],
+            citations=[
+                Citation(file="a.pdf", page=3, snippet="eight characters", marker=1)
+            ],
             used_hits=hits,
         ),
     )
@@ -39,7 +46,27 @@ def test_chat_returns_answer_and_citations(monkeypatch):
     body = _client(monkeypatch).post("/api/chat", json={"question": "How long?"}).json()
     assert body["answer"] == "At least 8 characters [1]."
     assert body["citations"][0]["page"] == 3
+    assert body["citations"][0]["file"] == "a.pdf"
+    assert body["citations"][0]["snippet"] == "eight characters"
+    assert body["citations"][0]["marker"] == 1
     assert "elapsed_ms" in body
+
+
+def test_chat_returns_the_rate_limit_detail_when_blocked(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setattr(api, "check_and_consume", lambda ip: (False, 0))
+    response = client.post("/api/chat", json={"question": "q"})
+    assert response.status_code == 429
+    assert (
+        response.json()["detail"]
+        == "This demo is rate limited. Clone the repo and run it with your own key."
+    )
+
+
+def test_chat_rejects_out_of_range_k(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.post("/api/chat", json={"question": "q", "k": -1}).status_code == 422
+    assert client.post("/api/chat", json={"question": "q", "k": 11}).status_code == 422
 
 
 def test_chat_rejects_empty_and_overlong_questions(monkeypatch):

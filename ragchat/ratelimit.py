@@ -50,13 +50,14 @@ def check_and_consume(ip: str) -> tuple[bool, int]:
     ip_key = f"rag:ip:{ip}:{hour}"
     day_key = f"rag:day:{dt.date.today().isoformat()}"
 
-    # TTL is best-effort: the counters are still correct without it, and the test
-    # double only implements INCR. The real Upstash client always has EXPIRE.
+    # Set a TTL on each fresh counter so Redis does not accumulate one key per
+    # hour/day forever. `_Redis` documents EXPIRE as part of its interface, so
+    # test doubles must implement it too.
     used = redis.incr(ip_key)
-    if used == 1 and hasattr(redis, "expire"):
+    if used == 1:
         redis.expire(ip_key, 3700)
     spent_today = redis.incr(day_key)
-    if spent_today == 1 and hasattr(redis, "expire"):
+    if spent_today == 1:
         redis.expire(day_key, 90_000)
 
     if spent_today > settings.daily_cap:

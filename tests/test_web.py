@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -5,8 +6,9 @@ WEB = Path(__file__).resolve().parent.parent / "web"
 
 def test_page_has_a_textarea_inside_a_form():
     html = (WEB / "index.html").read_text(encoding="utf-8")
-    assert "<textarea" in html
-    assert "<form" in html
+    form = re.search(r"<form\b.*?</form>", html, re.DOTALL)
+    assert form is not None
+    assert "<textarea" in form.group(0)
 
 
 def test_page_carries_no_credentials():

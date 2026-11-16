@@ -43,14 +43,18 @@ def test_parse_citations_ignores_out_of_range_markers():
 
 def test_parse_citations_resolves_the_marker_number_not_its_position():
     """Pins the contract: marker [2] means the second source, not "the first marker found"."""
-    assert [(c.file, c.page) for c in parse_citations("Only [2].", HITS)] == [("b.pdf", 11)]
+    cits = parse_citations("Only [2].", HITS)
+    assert [(c.file, c.page) for c in cits] == [("b.pdf", 11)]
+    assert cits[0].marker == 2
 
 
 def test_parse_citations_keeps_first_appearance_order():
-    assert [(c.file, c.page) for c in parse_citations("[2] then [1]", HITS)] == [
+    cits = parse_citations("[2] then [1]", HITS)
+    assert [(c.file, c.page) for c in cits] == [
         ("b.pdf", 11),
         ("a.pdf", 4),
     ]
+    assert [c.marker for c in cits] == [2, 1]
 
 
 def test_answer_returns_text_and_citations():
