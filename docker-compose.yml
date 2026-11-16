@@ -20,7 +20,8 @@ services:
       DATABASE_URL: postgresql://rag:rag@db:5432/rag
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
-      - "8000:8000"
+      # Host port 8000 is used by another project on some machines; override with APP_PORT.
+      - "${APP_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
