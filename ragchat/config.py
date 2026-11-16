@@ -6,6 +6,8 @@ import os
 import sys
 from dataclasses import dataclass
 
+from dotenv import load_dotenv
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -40,6 +42,7 @@ def _env_flag(name: str, default: bool) -> bool:
 
 
 def load_settings() -> Settings:
+    load_dotenv()
     rate_limit_enabled = _env_flag("RATE_LIMIT_ENABLED", False)
     upstash_url = os.environ.get("UPSTASH_REDIS_REST_URL", "").strip()
     upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "").strip()
