@@ -10,7 +10,9 @@
 /docs
 /.github
 
-# Local caches: Vercel does not read .gitignore, so exclude them here too.
+# Local caches, kept explicit. Vercel's built-in ignore list already drops `__pycache__`
+# at any depth and `.venv`; only `/.pytest_cache`, `/.ruff_cache` and stray root `/*.pyc`
+# add coverage here.
 /__pycache__
 /*.pyc
 /.pytest_cache

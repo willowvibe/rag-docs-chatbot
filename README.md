@@ -89,17 +89,23 @@ download when the cache is cold), and the first embed downloads the BGE model in
 `/tmp`. Subsequent requests on a warm instance are fast.
 
 Vercel's FastAPI framework preset serves the app at its own paths — `/`, `/api/*` and
-`/static/*` — with no rewrites. `vercel.json` only raises `maxDuration` to 300 s, which
-leaves room for a cold start. If you ever want the `/api` file-function lane instead of
-the preset, set the project's Framework Preset to "Other". Vercel runs the Python version
-named in `.python-version` (3.12); the `Dockerfile` and CI pin 3.11, and
-`requirements.txt` installs on both.
+`/static/*` — with no rewrites. `vercel.json` only sets `maxDuration` to 300 s, the
+Fluid-compute default and the maximum on the Hobby plan, so it pins the default rather
+than extending it; that leaves room for a cold start. If you ever want the `/api`
+file-function lane instead of the preset, set the project's Framework Preset to "Other".
+Vercel runs the Python version named in `.python-version` (3.12); the `Dockerfile` and CI
+pin 3.11, and `requirements.txt` installs on both.
 
 If the Python bundle exceeds Vercel's size limit, the same `Dockerfile` runs unchanged on
 Render or Fly — which is why the app contains no Vercel-specific code.
 
 To confirm the limits actually bite, run this against a deployment with
-`RATE_LIMIT_ENABLED=1`:
+`RATE_LIMIT_ENABLED=1`. Run it **once, on a fresh hour, from a single machine**: the
+per-IP counter is per hour, so a second run in the same hour begins with `429`s. Vercel
+overwrites a client-supplied `X-Forwarded-For` and sets `x-real-ip` to the same value, so
+the `x-forwarded-for` header below is inert on Vercel; the loop works because all 21
+requests share one public IP. The header is kept because a non-Vercel proxy would honour
+it.
 
 ```bash
 URL=https://<deployment>.vercel.app
@@ -111,8 +117,15 @@ done | sort | uniq -c
 ```
 
 Twenty requests should print `200` and the twenty-first `429`. Check that the UI shows
-the 429 message and still renders, and that the key is absent from the client:
-`curl -s "$URL/" | grep -c sk-ant` should print `0`.
+the 429 message and still renders, and that the key is absent from every client-side file.
+This prints `0` for each of `/`, `/static/app.js` and `/static/styles.css`:
+
+```bash
+URL=https://<deployment>.vercel.app
+for p in / /static/app.js /static/styles.css; do
+  printf '%s ' "$p"; curl -s "$URL$p" | grep -c sk-ant
+done
+```
 
 ## Corpus
 
