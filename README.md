@@ -30,9 +30,13 @@ fill in what you need; the app runs without an Anthropic key for tests and offli
 Rate limiting (the demo lane) is off by default and, when enabled, requires the Upstash
 REST URL.
 
+If another Postgres already holds port 5433, bring the database up on a different host port
+with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
+
 | Variable | Default |
 |---|---|
 | `DATABASE_URL` | `postgresql://rag:rag@localhost:5433/rag` |
+| `RAG_DB_PORT` | `5433` |
 | `ANTHROPIC_API_KEY` | empty |
 | `RAG_MODEL` | `claude-sonnet-5-5` |
 | `RAG_CHEAP_MODEL` | `claude-haiku-5-5` |
