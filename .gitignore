@@ -7,6 +7,11 @@ __pycache__/
 
 # Local environment
 .env
+.demo-work/
+
+# Eval output
+eval/report.json
+eval/report.md
 
 # Scratch space (progress ledgers etc.)
 .superpowers/
