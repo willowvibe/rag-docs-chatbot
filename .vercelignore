@@ -1,3 +1,7 @@
+# Vercel does not read .gitignore. Never upload a filled-in environment file.
+/.env
+/.env.*
+
 /.venv
 /.superpowers
 /tests

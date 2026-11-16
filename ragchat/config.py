@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import sys
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -31,7 +30,7 @@ def _env_int(name: str, default: int) -> int:
     try:
         return int(raw)
     except ValueError:
-        sys.exit(f"{name} must be an integer, got {raw!r}")
+        raise RuntimeError(f"{name} must be an integer, got {raw!r}") from None
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -47,7 +46,7 @@ def load_settings() -> Settings:
     upstash_url = os.environ.get("UPSTASH_REDIS_REST_URL", "").strip()
     upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "").strip()
     if rate_limit_enabled and not upstash_url:
-        sys.exit("RATE_LIMIT_ENABLED=1 requires UPSTASH_REDIS_REST_URL to be set.")
+        raise RuntimeError("RATE_LIMIT_ENABLED=1 requires UPSTASH_REDIS_REST_URL to be set.")
     return Settings(
         database_url=os.environ.get("DATABASE_URL", "postgresql://rag:rag@localhost:5433/rag"),
         anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", "").strip(),

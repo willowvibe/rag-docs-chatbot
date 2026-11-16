@@ -45,7 +45,13 @@ def test_demo_lane_requires_redis(monkeypatch):
     monkeypatch.setenv("RATE_LIMIT_ENABLED", "1")
     monkeypatch.delenv("UPSTASH_REDIS_REST_URL", raising=False)
     monkeypatch.delenv("UPSTASH_REDIS_REST_TOKEN", raising=False)
-    with pytest.raises(SystemExit, match="UPSTASH_REDIS_REST_URL"):
+    with pytest.raises(RuntimeError, match="UPSTASH_REDIS_REST_URL"):
+        load_settings()
+
+
+def test_non_integer_env_value_raises(monkeypatch):
+    monkeypatch.setenv("RAG_TOP_K", "abc")
+    with pytest.raises(RuntimeError, match="RAG_TOP_K"):
         load_settings()
 
 
