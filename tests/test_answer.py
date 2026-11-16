@@ -41,6 +41,18 @@ def test_parse_citations_ignores_out_of_range_markers():
     assert parse_citations("Claim [7].", HITS) == []
 
 
+def test_parse_citations_resolves_the_marker_number_not_its_position():
+    """Pins the contract: marker [2] means the second source, not "the first marker found"."""
+    assert [(c.file, c.page) for c in parse_citations("Only [2].", HITS)] == [("b.pdf", 11)]
+
+
+def test_parse_citations_keeps_first_appearance_order():
+    assert [(c.file, c.page) for c in parse_citations("[2] then [1]", HITS)] == [
+        ("b.pdf", 11),
+        ("a.pdf", 4),
+    ]
+
+
 def test_answer_returns_text_and_citations():
     client = FakeClient("Passwords must be at least 8 characters [1].")
     result = answer("How long?", HITS, client=client)
@@ -53,11 +65,13 @@ def test_answer_returns_text_and_citations():
 
 def test_answer_treats_missing_markers_as_uncited():
     client = FakeClient("I don't know based on the provided documents.")
-    assert answer("Unrelated?", HITS, client=client).citations == []
+    result = answer("Unrelated?", HITS, client=client)
+    assert result.citations == []
+    assert result.text == "I don't know based on the provided documents."
 
 
 def test_answer_with_no_hits_does_not_call_the_model():
     client = FakeClient("should not be used")
     result = answer("anything", [], client=client)
     assert client.calls == []
-    assert "provided documents" in result.text
+    assert result.text == "I don't know based on the provided documents."

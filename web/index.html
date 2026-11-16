@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ask the documents</title>
+  <meta name="description" content="Cited answers from a small public-domain corpus of NIST digital identity guidelines.">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#question">Skip to the question box</a>
+
+  <header class="masthead">
+    <p class="eyebrow">Document Q&amp;A</p>
+    <h1>Ask the documents</h1>
+    <p class="lede">Answers use only the retrieved passages, and every claim carries the file and page to check.</p>
+  </header>
+
+  <main class="workspace">
+    <section class="chat-pane" aria-labelledby="chat-heading">
+      <h2 id="chat-heading" class="pane-title">Conversation</h2>
+
+      <div id="transcript" class="transcript" role="log" aria-live="polite" aria-relevant="additions">
+        <p class="empty-state" id="empty-state">Ask about password length, rate limiting, or authenticator requirements.</p>
+      </div>
+
+      <form id="ask-form" class="composer" novalidate>
+        <label class="field-label" for="question">Your question</label>
+        <textarea id="question" name="question" rows="3" maxlength="500"
+                  placeholder="e.g. How long must passwords be?"
+                  autocomplete="off" spellcheck="true" required></textarea>
+        <div class="composer-row">
+          <p id="status" class="status" role="status" aria-live="polite">Enter sends &middot; Shift+Enter adds a new line</p>
+          <button id="send" class="send" type="submit">Ask</button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="sources-pane" aria-labelledby="sources-heading">
+      <h2 id="sources-heading" class="pane-title">Sources</h2>
+      <p class="pane-hint">Cited pages appear here. Select a citation such as <span class="marker-sample">[1]</span> to jump to its card.</p>
+      <div id="sources" class="sources">
+        <p class="empty-state muted" id="sources-empty">No sources yet.</p>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footnote">
+    <p>Two NIST Special Publications, public domain, included unmodified for a reproducible demo.</p>
+  </footer>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
