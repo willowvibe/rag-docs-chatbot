@@ -21,6 +21,14 @@ def test_discovery_accepts_a_single_file(tmp_path):
     assert discover_documents(doc) == [doc]
 
 
+def test_bundled_corpus_discovers_exactly_the_two_documents():
+    corpus = Path(__file__).resolve().parent.parent / "corpus"
+    assert [p.name for p in discover_documents(corpus)] == [
+        "nist-sp-800-63-4.pdf",
+        "nist-sp-800-63b.pdf",
+    ]
+
+
 class _FakeEmbedder:
     dim = 384
 

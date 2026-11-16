@@ -11,14 +11,22 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.fixture
+def store():
+    # The same database is used by `make ingest` and by /api/health, so a test that
+    # leaves rows behind corrupts every later chunk count. Clean on both sides.
+    s = Store(os.environ["DATABASE_URL"])
+    s.ensure_schema()
+    s.replace_doc("d", [], [])
+    yield s
+    s.replace_doc("d", [], [])
+
+
 def _chunk(i, text):
     return Chunk(doc_id="d", file="f.pdf", page=1, chunk_index=i, text=text, tokens=3)
 
 
-def test_replace_doc_is_idempotent():
-    store = Store(os.environ["DATABASE_URL"])
-    store.ensure_schema()
-    store.replace_doc("d", [], [])
+def test_replace_doc_is_idempotent(store):
     chunks = [_chunk(0, "alpha"), _chunk(1, "beta")]
     vectors = [[0.0] * 383 + [1.0], [0.0] * 382 + [1.0, 0.0]]
     assert store.replace_doc("d", chunks, vectors) == 2
@@ -26,10 +34,7 @@ def test_replace_doc_is_idempotent():
     assert store.count("d") == 2
 
 
-def test_search_returns_nearest_first():
-    store = Store(os.environ["DATABASE_URL"])
-    store.ensure_schema()
-    store.replace_doc("d", [], [])
+def test_search_returns_nearest_first(store):
     chunks = [_chunk(0, "near"), _chunk(1, "far")]
     vectors = [[1.0] + [0.0] * 383, [0.0] * 383 + [1.0]]
     store.replace_doc("d", chunks, vectors)

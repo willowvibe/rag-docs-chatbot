@@ -57,7 +57,7 @@ eval is reproducible from a fresh clone:
   and Lifecycle Management*
 - `nist-sp-800-63-4.pdf` — NIST SP 800-63-4, *Digital Identity Guidelines*
 
-Licensing is documented in `corpus/LICENSE.corpus.md`; the files' SHA-256 hashes are
+Licensing is documented in `corpus/LICENSE.corpus.txt`; the files' SHA-256 hashes are
 recorded in `corpus/SHA256SUMS` and checked by `make verify-corpus`.
 
 ## Layout
@@ -71,4 +71,4 @@ tests/         pytest suite
 ## Licence
 
 MIT — see `LICENSE`. The corpus documents are U.S. Government works in the public domain
-(see `corpus/LICENSE.corpus.md`).
+(see `corpus/LICENSE.corpus.txt`).
