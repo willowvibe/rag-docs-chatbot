@@ -196,6 +196,30 @@ def test_answer_retries_with_the_fallback_model_when_the_primary_fails(caplog):
     assert "RuntimeError" in caplog.text
 
 
+def test_answer_retries_with_the_fallback_model_when_the_completion_is_empty(caplog):
+    client = FlakyClient(
+        [
+            RuntimeError(
+                "empty completion from primary-model (done_reason=length)"
+            )
+        ],
+        "Fallback answer [2].",
+    )
+    result = answer(
+        "Rate limiting?",
+        HITS,
+        client=client,
+        model="primary-model",
+        fallback_model="backup-model",
+    )
+
+    assert result.text == "Fallback answer [2]."
+    assert [call["model"] for call in client.calls] == ["primary-model", "backup-model"]
+    # The warning names the exception type only, never its message (no secret leakage).
+    assert "RuntimeError" in caplog.text
+    assert "backup-model" in caplog.text
+
+
 def test_answer_raises_when_the_primary_and_fallback_both_fail():
     client = FlakyClient(
         [RuntimeError("primary boom"), RuntimeError("fallback boom")],

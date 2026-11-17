@@ -51,10 +51,11 @@ class _Messages:
 class OllamaClient:
     """Duck-types the subset of the Anthropic SDK this project uses."""
 
-    def __init__(self, api_key: str, host: str, timeout: float = 120):
+    def __init__(self, api_key: str, host: str, timeout: float = 120, think: bool = False):
         self.api_key = api_key
         self.host = host.rstrip("/")
         self.timeout = timeout
+        self.think = think
         self._http = httpx.Client(timeout=timeout)
         self.messages = _Messages(self)
 
@@ -73,6 +74,7 @@ class OllamaClient:
                 ],
             ],
             "stream": False,
+            "think": self.think,
             "options": {"temperature": temperature, "num_predict": max_tokens},
         }
         try:
@@ -89,12 +91,22 @@ class OllamaClient:
                 f"Ollama request failed with status {response.status_code}: {excerpt}"
             )
         data = response.json()
-        return _Message(data["message"]["content"])
+        content = _flatten_content(data["message"]["content"])
+        if not content.strip():
+            done_reason = data.get("done_reason")
+            raise RuntimeError(
+                f"empty completion from {model} (done_reason={done_reason})"
+            )
+        return _Message(content)
 
 
 def make_client(settings) -> OllamaClient:
     if settings.llm_provider == "ollama":
-        return OllamaClient(settings.ollama_api_key, settings.ollama_host)
+        return OllamaClient(
+            settings.ollama_api_key,
+            settings.ollama_host,
+            think=getattr(settings, "llm_think", False),
+        )
     if settings.llm_provider == "anthropic":
         import anthropic
 
