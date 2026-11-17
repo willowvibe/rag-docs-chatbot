@@ -11,6 +11,7 @@ from ragchat.eval.run_eval import (
     INGEST_HINT,
     JUDGE_SYSTEM,
     _judge,
+    contains_evidence,
     main,
     preflight,
     render_markdown,
@@ -211,6 +212,23 @@ def test_judge_returns_none_when_no_score_is_present():
     assert _judge(client, "m", "q", "a", "s") is None
 
 
+# --- evidence matching ---------------------------------------------------------
+
+@pytest.mark.parametrize(("text", "phrase"), [
+    ("Minimum of 15 characters", "minimum of 15 characters"),
+    ("minimum of\n15 characters", "minimum of 15 characters"),
+    ("minimum of  15\n\tcharacters", "minimum of 15 characters"),
+    ("authen-\ntication is required", "authentication"),
+    ("authen-\n tication is required", "authentication"),
+])
+def test_contains_evidence_normalises_case_and_whitespace(text, phrase):
+    assert contains_evidence(text, phrase)
+
+
+def test_contains_evidence_rejects_an_absent_phrase():
+    assert not contains_evidence("something unrelated", "eight characters")
+
+
 # --- metrics -------------------------------------------------------------------
 
 def test_run_eval_averages_over_every_question(tmp_path):
@@ -260,6 +278,53 @@ def test_run_eval_scores_a_miss_at_zero(tmp_path):
     assert results["hit_at_k"] == 0.0
     assert results["mrr"] == 0.0
     assert results["grounding_rate"] == 0.0
+
+
+def test_run_eval_evidence_on_a_non_gold_page_counts_only_for_evidence(tmp_path):
+    golden = _write_golden(tmp_path, [_item(page=2, phrase="authentication")])
+    hits = [_hit("corpus/a.pdf", 9, text="Authen-\ntication is required.", score=0.4)]
+    client = _FakeClient(answers=["Answer [1]."])
+
+    results = run_eval(golden, _FakeStore(hits), _FakeEmbedder(), client, "m", k=5)
+
+    assert results["hit_at_k"] == 0.0
+    assert results["mrr"] == 0.0
+    assert results["grounding_rate"] == 0.0
+    assert results["evidence_hit_at_k"] == 1.0
+    assert results["evidence_mrr"] == 1.0
+    assert results["evidence_grounding_rate"] == 1.0
+    assert results["per_question"][0]["evidence_rank"] == 1
+    assert results["per_question"][0]["cited_evidence"] is True
+
+
+def test_run_eval_evidence_grounding_requires_a_cited_evidence_passage(tmp_path):
+    golden = _write_golden(tmp_path, [_item(page=2)])
+    hits = [
+        _hit("corpus/a.pdf", 9, text="unrelated", score=0.9),
+        _hit("corpus/a.pdf", 9, text="eight characters", score=0.8),
+    ]
+    client = _FakeClient(answers=["Answer [1]."])
+
+    results = run_eval(golden, _FakeStore(hits), _FakeEmbedder(), client, "m", k=5)
+
+    assert results["evidence_hit_at_k"] == 1.0
+    assert results["evidence_mrr"] == 0.5
+    assert results["evidence_grounding_rate"] == 0.0
+    assert results["per_question"][0]["cited_evidence"] is False
+
+
+def test_run_eval_evidence_grounding_accepts_a_cited_non_gold_evidence_passage(tmp_path):
+    golden = _write_golden(tmp_path, [_item(page=2)])
+    hits = [
+        _hit("corpus/a.pdf", 9, text="unrelated", score=0.9),
+        _hit("corpus/a.pdf", 9, text="eight characters", score=0.8),
+    ]
+    client = _FakeClient(answers=["Answer [2]."])
+
+    results = run_eval(golden, _FakeStore(hits), _FakeEmbedder(), client, "m", k=5)
+
+    assert results["evidence_grounding_rate"] == 1.0
+    assert results["per_question"][0]["cited_evidence"] is True
 
 
 def test_run_eval_mrr_uses_the_rank(tmp_path):
@@ -378,6 +443,20 @@ def test_render_markdown_reports_headline_values_and_unparsed_count(tmp_path):
     assert "| Faithfulness (LLM judge, 0–1) | **1.00** |" in markdown
     assert "100 chunks across the golden files (a.pdf: 40; b.pdf: 60)" in markdown
     assert "| Judge replies unparsed | 0 |" in markdown
+
+
+def test_render_markdown_labels_evidence_and_strict_page_metrics(tmp_path):
+    golden = _write_golden(tmp_path, [_item(page=2, phrase="authentication")])
+    hits = [_hit("corpus/a.pdf", 9, text="Authen-\ntication is required.")]
+    results = run_eval(golden, _FakeStore(hits), _FakeEmbedder(), _FakeClient(), "m", k=5)
+
+    markdown = render_markdown(results, "m", {"a.pdf": 1})
+
+    assert "Evidence hit@5" in markdown
+    assert "Evidence MRR" in markdown
+    assert "Citation contains evidence" in markdown
+    assert "(strict: exact gold page)" in markdown
+    assert "evidence phrase" in markdown
 
 
 def test_render_markdown_surfaces_unparsed_judge_replies(tmp_path):

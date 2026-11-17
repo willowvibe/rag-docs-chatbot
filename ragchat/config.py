@@ -18,7 +18,7 @@ DEFAULT_FALLBACK_MODELS = {
     "anthropic": "",
 }
 
-DEFAULT_RERANK_MODEL = "BAAI/bge-reranker-base"
+DEFAULT_RERANK_MODEL = "Xenova/ms-marco-MiniLM-L-12-v2"
 
 
 @dataclass(frozen=True)

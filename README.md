@@ -59,7 +59,7 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `RAG_FALLBACK_MODEL` | `deepseek-v4.1-flash:1017` (anthropic: none) |
 | `RAG_TOP_K` | `5` |
 | `RAG_RERANK` | `0` (off) |
-| `RAG_RERANK_MODEL` | `BAAI/bge-reranker-base` |
+| `RAG_RERANK_MODEL` | `Xenova/ms-marco-MiniLM-L-12-v2` |
 | `RAG_RERANK_CANDIDATES` | `20` |
 | `MAX_QUESTION_CHARS` | `500` |
 | `RATE_LIMIT_ENABLED` | `0` |
@@ -67,6 +67,8 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `DAILY_CAP` | `500` |
 | `UPSTASH_REDIS_REST_URL` | empty |
 | `UPSTASH_REDIS_REST_TOKEN` | empty |
+
+On the 30-question golden set graded by evidence phrase, the MiniLM reranker raised evidence MRR@5 from 0.767 to 0.818 (first-ranked passage 19 -> 22 of 30) with no loss in hit@5, at about 1.5 s per query on CPU, so it is off by default for serverless deploys.
 
 ## Deploy
 

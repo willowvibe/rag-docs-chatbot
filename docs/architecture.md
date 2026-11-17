@@ -46,7 +46,7 @@ flowchart LR
    enabled, the search instead fetches `RAG_RERANK_CANDIDATES` chunks (default 20).
 3. **Rerank (optional).** With `RAG_RERANK` on, `ragchat/rerank.py` scores each
    query-passage pair with a local cross-encoder (`RAG_RERANK_MODEL`, default
-   `BAAI/bge-reranker-base`) and keeps the highest-scoring `k` chunks. The model loads
+   `Xenova/ms-marco-MiniLM-L-12-v2`) and keeps the highest-scoring `k` chunks. The model loads
    lazily on the first reranked request, so the default path avoids the download.
 4. **Prompt.** `ragchat/answer.py` numbers the retrieved chunks `[1]..[n]` and sends them,
    plus the question, with a system prompt that allows only those sources and requires a
