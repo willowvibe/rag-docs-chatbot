@@ -69,6 +69,14 @@ class ChatRequest(BaseModel):
     k: int | None = Field(default=None, ge=1, le=10)
 
 
+def _seconds_until_next_hour() -> int:
+    return 3600 - (int(time.time()) % 3600)
+
+
+def _seconds_until_utc_midnight() -> int:
+    return 86400 - (int(time.time()) % 86400)
+
+
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok", "chunks": _store().count()}
@@ -97,11 +105,22 @@ def chat(body: ChatRequest, request: Request) -> dict:
     # x-forwarded-for, so treat the first value only as a fallback.
     ip = request.headers.get("x-real-ip") or request.headers.get("x-forwarded-for", "")
     ip = (ip or (request.client.host if request.client else "") or "unknown").split(",")[0].strip()
-    allowed, remaining = check_and_consume(ip)
+    allowed, remaining, reason = check_and_consume(ip)
     if not allowed:
+        if reason == "daily":
+            resets_in_seconds = _seconds_until_utc_midnight()
+        else:
+            resets_in_seconds = _seconds_until_next_hour()
         raise HTTPException(
             status_code=429,
-            detail="This demo is rate limited. Clone the repo and run it with your own key.",
+            detail={
+                "message": (
+                    "This demo is rate limited. Clone the repo and run it with your own key."
+                ),
+                "limit": settings.per_ip_per_hour,
+                "resets_in_seconds": resets_in_seconds,
+                "reason": reason,
+            },
         )
 
     k = min(body.k or settings.top_k, 10)
@@ -126,7 +145,11 @@ def chat(body: ChatRequest, request: Request) -> dict:
             for c in result.citations
         ],
         "model": settings.model,
+        "limit": settings.per_ip_per_hour if settings.rate_limit_enabled else None,
         "remaining": remaining,
+        "resets_in_seconds": (
+            _seconds_until_next_hour() if settings.rate_limit_enabled else None
+        ),
         "elapsed_ms": int((time.perf_counter() - started) * 1000),
     }
 
