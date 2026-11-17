@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 
 from ragchat.store import Hit
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You answer questions using ONLY the numbered sources provided.
 
@@ -47,6 +50,48 @@ def build_messages(question: str, hits: list[Hit]) -> list[dict]:
     ]
 
 
+_FULLWIDTH_MARKER = re.compile(r"【\s*(\d{1,2})\s*(?:†[^】]*)?】")
+_NUMBER_LIST_MARKER = re.compile(r"\[([ \t]*\d{1,2}(?:[ \t]*,[ \t]*\d{1,2})+[ \t]*)\]")
+_DETAILED_MARKER = re.compile(r"\[(\d{1,2})(?:[ \t]*[,†:][ \t]*|[ \t]+-[ \t]*)[^\]\n]*\]")
+_SOURCE_ONLY_MARKER = re.compile(
+    r"\[\s*(?P<file>(?!\d)[^\[\]\n,]+?)\s*(?:,\s*|\s+)"
+    r"(?:page|p\.?)\s*(?P<page>\d{1,4})\s*\]",
+    re.IGNORECASE,
+)
+
+
+def normalize_citation_markers(text: str) -> str:
+    """Rewrite citation markers with extraneous details to the standard `[n]` form."""
+    text = _FULLWIDTH_MARKER.sub(r"[\1]", text)
+    text = _NUMBER_LIST_MARKER.sub(
+        lambda m: "".join(f"[{n}]" for n in re.findall(r"\d{1,2}", m.group(1))),
+        text,
+    )
+    return _DETAILED_MARKER.sub(r"[\1]", text)
+
+
+def _basename(path: str) -> str:
+    return re.split(r"[\\/]", path.strip())[-1].strip().casefold()
+
+
+def resolve_source_only_markers(text: str, hits: list[Hit]) -> str:
+    """Rewrite `[file, page N]` markers to `[n]` when they uniquely identify a hit."""
+
+    def replace(match: re.Match) -> str:
+        file = _basename(match.group("file"))
+        page = int(match.group("page"))
+        matches = [
+            i
+            for i, hit in enumerate(hits, start=1)
+            if _basename(hit.file) == file and hit.page == page
+        ]
+        if len(matches) == 1:
+            return f"[{matches[0]}]"
+        return match.group(0)
+
+    return _SOURCE_ONLY_MARKER.sub(replace, text)
+
+
 def parse_citations(text: str, hits: list[Hit]) -> list[Citation]:
     seen: list[int] = []
     for raw in re.findall(r"\[(\d{1,2})\]", text):
@@ -62,20 +107,47 @@ def parse_citations(text: str, hits: list[Hit]) -> list[Citation]:
 
 
 def answer(
-    question: str, hits: list[Hit], client=None, model: str = "claude-sonnet-5-5"
+    question: str,
+    hits: list[Hit],
+    client=None,
+    model: str = "claude-sonnet-5-5",
+    fallback_model: str | None = None,
 ) -> Answer:
     if not hits:
         return Answer(text=REFUSAL, citations=[], used_hits=[])
     if client is None:
-        import anthropic
+        from ragchat.config import load_settings
+        from ragchat.llm import make_client
 
-        client = anthropic.Anthropic()
-    response = client.messages.create(
-        model=model,
-        max_tokens=700,
-        temperature=0,
-        system=SYSTEM_PROMPT,
-        messages=build_messages(question, hits)[1:],
-    )
+        settings = load_settings()
+        client = make_client(settings)
+        if fallback_model is None:
+            fallback_model = settings.fallback_model
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=700,
+            temperature=0,
+            system=SYSTEM_PROMPT,
+            messages=build_messages(question, hits)[1:],
+        )
+    except Exception as exc:
+        if not fallback_model or fallback_model == model:
+            raise
+        logger.warning(
+            "Primary model %s failed with %s; retrying once with fallback model %s",
+            model,
+            type(exc).__name__,
+            fallback_model,
+        )
+        response = client.messages.create(
+            model=fallback_model,
+            max_tokens=700,
+            temperature=0,
+            system=SYSTEM_PROMPT,
+            messages=build_messages(question, hits)[1:],
+        )
     text = "".join(block.text for block in response.content if block.type == "text").strip()
+    text = normalize_citation_markers(text)
+    text = resolve_source_only_markers(text, hits)
     return Answer(text=text, citations=parse_citations(text, hits), used_hits=hits)

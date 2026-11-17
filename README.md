@@ -5,28 +5,41 @@ Ask your documents, get cited answers — plus an eval score you can reproduce.
 This repository is a document-QA app over a small, public-domain corpus. Answers are
 generated from retrieved passages and carry citations back to the source document, and
 the retrieval pipeline ships with an eval harness so the numbers can be regenerated from
-a fresh clone.
+a fresh clone. Optionally, cross-encoder reranking retrieves N candidates and reorders
+them down to the top-k passages used for the answer.
 
-**Status:** milestone 1 scaffold. The settings module and the corpus are in place;
-ingestion, retrieval, the API and the eval arrive in later milestones.
+**Status:** pre-release. What works today: PDF, Markdown and HTML ingestion; local BGE
+embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud (configurable
+model, default `glm-5.3-flash`) grounded in retrieved passages with `[n]` citations and an
+explicit refusal; a rate-limited FastAPI service and
+web UI; a 40-question eval harness; a Docker quickstart; and CI. If the primary model call
+fails, the API retries once on the fallback model (`RAG_FALLBACK_MODEL`). The published eval
+report, a demo video and a live demo are coming.
 
 ## Quick start
 
+Requires Docker and Python 3.12. Answering needs an `OLLAMA_API_KEY` (Ollama Cloud), or an `ANTHROPIC_API_KEY` with
+`LLM_PROVIDER=anthropic`; ingestion,
+retrieval and the tests work without one.
+
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -r requirements-dev.txt
 
-# Settings tests
-.venv/bin/pytest tests/test_config.py -v
+make up       # start Postgres with pgvector
+make ingest   # prints: total=386 chunks across 2 documents
+make serve    # http://localhost:8000
 
-# Verify the bundled corpus has not changed
-make verify-corpus
+# In another shell:
+make test
 ```
+
+See [docs/architecture.md](docs/architecture.md) for the ingest and query paths.
 
 ## Configuration
 
 Every environment read lives in `ragchat/config.py`. Copy `.env.example` to `.env` and
-fill in what you need; the app runs without an Anthropic key for tests and offline work.
+fill in what you need; the app runs without an LLM key for tests and offline work.
 Rate limiting (the demo lane) is off by default and, when enabled, requires the Upstash
 REST URL.
 
@@ -37,10 +50,18 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 |---|---|
 | `DATABASE_URL` | `postgresql://rag:rag@localhost:5433/rag` |
 | `RAG_DB_PORT` | `5433` |
-| `ANTHROPIC_API_KEY` | empty |
-| `RAG_MODEL` | `claude-sonnet-5-5` |
-| `RAG_CHEAP_MODEL` | `claude-haiku-5-5` |
+| `LLM_PROVIDER` | `ollama` (or `anthropic`) |
+| `OLLAMA_API_KEY` | empty |
+| `OLLAMA_HOST` | `https://ollama.com` |
+| `ANTHROPIC_API_KEY` | empty (only with `LLM_PROVIDER=anthropic`) |
+| `RAG_MODEL` | `glm-5.3-flash` (anthropic: `claude-sonnet-5-5`) |
+| `RAG_CHEAP_MODEL` | `glm-5.3-flash` (anthropic: `claude-haiku-5-5`) |
+| `RAG_FALLBACK_MODEL` | `deepseek-v4.1-flash:1017` (anthropic: none) |
 | `RAG_TOP_K` | `5` |
+| `RAG_RERANK` | `0` (off; Docker Compose sets `1`) |
+| `RAG_RERANK_MODEL` | `Xenova/ms-marco-MiniLM-L-12-v2` |
+| `RAG_RERANK_CANDIDATES` | `15` |
+| `RAG_HYBRID` | `0` (off; Docker Compose sets `1`) |
 | `MAX_QUESTION_CHARS` | `500` |
 | `RATE_LIMIT_ENABLED` | `0` |
 | `PER_IP_PER_HOUR` | `20` |
@@ -48,10 +69,14 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `UPSTASH_REDIS_REST_URL` | empty |
 | `UPSTASH_REDIS_REST_TOKEN` | empty |
 
+Docker Compose turns both `RAG_HYBRID` and `RAG_RERANK` on, while the code default is off so serverless/Vercel deploys are unaffected.
+
+Hybrid search fuses vector and keyword results with reciprocal rank fusion (k=60). On the 40-question golden set, hybrid + MiniLM reranking of 15 candidates raised evidence hit@5 0.875 -> 0.925 and MRR@5 0.713 -> 0.805 versus vector-only, adding about 1.25 s per question on a 16-thread CPU (reranking costs ~78 ms per candidate; search itself ~60 ms).
+
 ## Deploy
 
 The app runs in two lanes. **Self-host** means running it locally or in Docker with your
-own `ANTHROPIC_API_KEY`. **Hosted demo** means running it on Vercel, where the owner's key
+own `OLLAMA_API_KEY` (or Anthropic key). **Hosted demo** means running it on Vercel, where the owner's key
 lives in the project's environment variables — never in the browser — and per-IP and
 per-day limits backstop it. `RATE_LIMIT_ENABLED` ships as `0`; only the demo deployment
 sets it to `1`.
@@ -69,7 +94,7 @@ inside the deployment.
 
 Set these in the Vercel project settings:
 
-- `ANTHROPIC_API_KEY`
+- `OLLAMA_API_KEY` (or `LLM_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY`)
 - `DATABASE_URL`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
@@ -94,7 +119,7 @@ Fluid-compute default and the maximum on the Hobby plan, so it pins the default 
 than extending it; that leaves room for a cold start. If you ever want the `/api`
 file-function lane instead of the preset, set the project's Framework Preset to "Other".
 Vercel runs the Python version named in `.python-version` (3.12); the `Dockerfile` and CI
-pin 3.11, and `requirements.txt` installs on both.
+use 3.12 too, so every environment runs the same interpreter.
 
 If the Python bundle exceeds Vercel's size limit, the same `Dockerfile` runs unchanged on
 Render or Fly — which is why the app contains no Vercel-specific code.
@@ -143,7 +168,12 @@ recorded in `corpus/SHA256SUMS` and checked by `make verify-corpus`.
 
 ```
 ragchat/       application package (settings live in config.py)
+ragchat/eval/  golden-set validator and eval runner
+api/           Vercel entry point
+web/           static chat UI
 corpus/        public-domain source documents + provenance
+eval/          golden questions and generated report
+docs/          architecture notes
 tests/         pytest suite
 ```
 

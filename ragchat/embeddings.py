@@ -19,4 +19,8 @@ class Embedder:
         if missing:
             for text, vector in zip(missing, self._model.embed(missing)):
                 self._cache[text] = [float(x) for x in vector]
-        return [self._cache[t] for t in texts]
+        # Return copies so callers mutating a vector cannot corrupt the cache.
+        return [list(self._cache[t]) for t in texts]
+
+    def clear_cache(self) -> None:
+        self._cache.clear()

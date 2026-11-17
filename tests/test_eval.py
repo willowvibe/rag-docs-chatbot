@@ -4,11 +4,14 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
+import psycopg
 import pytest
 
 from ragchat.eval.run_eval import (
+    INGEST_HINT,
     JUDGE_SYSTEM,
     _judge,
+    contains_evidence,
     main,
     preflight,
     render_markdown,
@@ -154,9 +157,13 @@ class _FakeStore:
             self._batches = [list(batch) for batch in hits]
         self._next = 0
         self.k_values = []
+        self.queries = []
+        self.hybrid_values = []
 
-    def search(self, vector, k=1):
+    def search(self, vector, k=1, query=None, hybrid=False):
         self.k_values.append(k)
+        self.queries.append(query)
+        self.hybrid_values.append(hybrid)
         if self._next < len(self._batches):
             batch = self._batches[self._next]
             self._next += 1
@@ -207,6 +214,23 @@ def test_judge_returns_none_when_no_score_is_present():
     client = _FakeClient(judges=["I cannot grade this answer."])
 
     assert _judge(client, "m", "q", "a", "s") is None
+
+
+# --- evidence matching ---------------------------------------------------------
+
+@pytest.mark.parametrize(("text", "phrase"), [
+    ("Minimum of 15 characters", "minimum of 15 characters"),
+    ("minimum of\n15 characters", "minimum of 15 characters"),
+    ("minimum of  15\n\tcharacters", "minimum of 15 characters"),
+    ("authen-\ntication is required", "authentication"),
+    ("authen-\n tication is required", "authentication"),
+])
+def test_contains_evidence_normalises_case_and_whitespace(text, phrase):
+    assert contains_evidence(text, phrase)
+
+
+def test_contains_evidence_rejects_an_absent_phrase():
+    assert not contains_evidence("something unrelated", "eight characters")
 
 
 # --- metrics -------------------------------------------------------------------
@@ -260,6 +284,53 @@ def test_run_eval_scores_a_miss_at_zero(tmp_path):
     assert results["grounding_rate"] == 0.0
 
 
+def test_run_eval_evidence_on_a_non_gold_page_counts_only_for_evidence(tmp_path):
+    golden = _write_golden(tmp_path, [_item(page=2, phrase="authentication")])
+    hits = [_hit("corpus/a.pdf", 9, text="Authen-\ntication is required.", score=0.4)]
+    client = _FakeClient(answers=["Answer [1]."])
+
+    results = run_eval(golden, _FakeStore(hits), _FakeEmbedder(), client, "m", k=5)
+
+    assert results["hit_at_k"] == 0.0
+    assert results["mrr"] == 0.0
+    assert results["grounding_rate"] == 0.0
+    assert results["evidence_hit_at_k"] == 1.0
+    assert results["evidence_mrr"] == 1.0
+    assert results["evidence_grounding_rate"] == 1.0
+    assert results["per_question"][0]["evidence_rank"] == 1
+    assert results["per_question"][0]["cited_evidence"] is True
+
+
+def test_run_eval_evidence_grounding_requires_a_cited_evidence_passage(tmp_path):
+    golden = _write_golden(tmp_path, [_item(page=2)])
+    hits = [
+        _hit("corpus/a.pdf", 9, text="unrelated", score=0.9),
+        _hit("corpus/a.pdf", 9, text="eight characters", score=0.8),
+    ]
+    client = _FakeClient(answers=["Answer [1]."])
+
+    results = run_eval(golden, _FakeStore(hits), _FakeEmbedder(), client, "m", k=5)
+
+    assert results["evidence_hit_at_k"] == 1.0
+    assert results["evidence_mrr"] == 0.5
+    assert results["evidence_grounding_rate"] == 0.0
+    assert results["per_question"][0]["cited_evidence"] is False
+
+
+def test_run_eval_evidence_grounding_accepts_a_cited_non_gold_evidence_passage(tmp_path):
+    golden = _write_golden(tmp_path, [_item(page=2)])
+    hits = [
+        _hit("corpus/a.pdf", 9, text="unrelated", score=0.9),
+        _hit("corpus/a.pdf", 9, text="eight characters", score=0.8),
+    ]
+    client = _FakeClient(answers=["Answer [2]."])
+
+    results = run_eval(golden, _FakeStore(hits), _FakeEmbedder(), client, "m", k=5)
+
+    assert results["evidence_grounding_rate"] == 1.0
+    assert results["per_question"][0]["cited_evidence"] is True
+
+
 def test_run_eval_mrr_uses_the_rank(tmp_path):
     golden = _write_golden(tmp_path, [_item(page=2)])
     hits = [
@@ -273,6 +344,26 @@ def test_run_eval_mrr_uses_the_rank(tmp_path):
     assert results["hit_at_k"] == 1.0
     assert results["mrr"] == 0.5
     assert store.k_values == [5]
+
+
+def test_run_eval_passes_the_query_and_hybrid_flag_to_search(tmp_path):
+    golden = _write_golden(tmp_path, [_item("q1", question="How long?")])
+    store = _FakeStore([_hit("corpus/a.pdf", 2)])
+
+    run_eval(golden, store, _FakeEmbedder(), _FakeClient(), "m", k=5, hybrid=True)
+
+    assert store.queries == ["How long?"]
+    assert store.hybrid_values == [True]
+
+
+def test_run_eval_defaults_to_vector_search(tmp_path):
+    golden = _write_golden(tmp_path, [_item("q1", question="How long?")])
+    store = _FakeStore([_hit("corpus/a.pdf", 2)])
+
+    run_eval(golden, store, _FakeEmbedder(), _FakeClient(), "m", k=5)
+
+    assert store.queries == ["How long?"]
+    assert store.hybrid_values == [False]
 
 
 def test_run_eval_only_sees_the_top_k(tmp_path):
@@ -376,6 +467,32 @@ def test_render_markdown_reports_headline_values_and_unparsed_count(tmp_path):
     assert "| Faithfulness (LLM judge, 0–1) | **1.00** |" in markdown
     assert "100 chunks across the golden files (a.pdf: 40; b.pdf: 60)" in markdown
     assert "| Judge replies unparsed | 0 |" in markdown
+    assert "retrieval: vector" in markdown
+
+
+def test_render_markdown_names_the_hybrid_retrieval_mode(tmp_path):
+    golden = _write_golden(tmp_path, [_item("q1")])
+    results = run_eval(golden, _FakeStore([_hit("corpus/a.pdf", 2)]),
+                       _FakeEmbedder(), _FakeClient(), "m", k=5, hybrid=True)
+
+    markdown = render_markdown(results, "m", {"a.pdf": 1}, hybrid=True)
+
+    assert "retrieval: hybrid" in markdown
+    assert "reranker: none" in markdown
+
+
+def test_render_markdown_labels_evidence_and_strict_page_metrics(tmp_path):
+    golden = _write_golden(tmp_path, [_item(page=2, phrase="authentication")])
+    hits = [_hit("corpus/a.pdf", 9, text="Authen-\ntication is required.")]
+    results = run_eval(golden, _FakeStore(hits), _FakeEmbedder(), _FakeClient(), "m", k=5)
+
+    markdown = render_markdown(results, "m", {"a.pdf": 1})
+
+    assert "Evidence hit@5" in markdown
+    assert "Evidence MRR" in markdown
+    assert "Citation contains evidence" in markdown
+    assert "(strict: exact gold page)" in markdown
+    assert "evidence phrase" in markdown
 
 
 def test_render_markdown_surfaces_unparsed_judge_replies(tmp_path):
@@ -418,7 +535,8 @@ def test_preflight_rejects_an_empty_store(tmp_path):
 
     problems = preflight(golden, _PreflightStore(0))
 
-    assert problems == ["store is empty; ingest the corpus before running the eval"]
+    assert problems == [f"store is empty; {INGEST_HINT}"]
+    assert "make up && make ingest" in problems[0]
 
 
 def test_preflight_rejects_a_short_golden_set(tmp_path):
@@ -444,12 +562,12 @@ def test_preflight_rejects_a_golden_file_with_no_chunks(tmp_path):
 
 def test_main_fails_fast_without_an_api_key(monkeypatch, tmp_path, capsys):
     monkeypatch.chdir(tmp_path)
-    settings = SimpleNamespace(anthropic_api_key="", database_url="x",
-                               model="m", top_k=5)
+    settings = SimpleNamespace(llm_api_key="", llm_key_env="OLLAMA_API_KEY",
+                               database_url="x", model="m", top_k=5)
     monkeypatch.setattr("ragchat.config.load_settings", lambda: settings)
 
     assert main(["run_eval"]) == 1
-    assert "ANTHROPIC_API_KEY" in capsys.readouterr().err
+    assert "OLLAMA_API_KEY" in capsys.readouterr().err
     assert not (tmp_path / "eval/report.json").exists()
     assert not (tmp_path / "eval/report.md").exists()
 
@@ -458,12 +576,39 @@ def test_main_writes_no_report_when_preflight_fails(monkeypatch, tmp_path, capsy
     monkeypatch.chdir(tmp_path)
     (tmp_path / "eval").mkdir()
     (tmp_path / "eval/golden.jsonl").write_text("", encoding="utf-8")
-    settings = SimpleNamespace(anthropic_api_key="key", database_url="x",
-                               model="m", top_k=5)
+    settings = SimpleNamespace(llm_api_key="key", llm_key_env="OLLAMA_API_KEY",
+                               database_url="x", model="m", top_k=5)
     monkeypatch.setattr("ragchat.config.load_settings", lambda: settings)
     monkeypatch.setattr("ragchat.eval.run_eval.Store", lambda url: _PreflightStore(0))
 
-    assert main(["run_eval"]) == 1
-    assert "Preflight failed; no report written." in capsys.readouterr().err
+    with pytest.raises(SystemExit) as exc_info:
+        main(["run_eval"])
+    assert exc_info.value.code != 0
+    assert "make up && make ingest" in capsys.readouterr().err
+    assert not (tmp_path / "eval/report.json").exists()
+    assert not (tmp_path / "eval/report.md").exists()
+
+
+def test_main_exits_with_a_hint_when_the_database_is_unreachable(
+        monkeypatch, tmp_path, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "eval/golden.jsonl").write_text("", encoding="utf-8")
+    settings = SimpleNamespace(llm_api_key="key", llm_key_env="OLLAMA_API_KEY",
+                               database_url="x", model="m", top_k=5)
+    monkeypatch.setattr("ragchat.config.load_settings", lambda: settings)
+
+    class _UnreachableStore:
+        def count(self):
+            raise psycopg.OperationalError("connection refused")
+
+    monkeypatch.setattr("ragchat.eval.run_eval.Store", lambda url: _UnreachableStore())
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["run_eval"])
+    assert exc_info.value.code != 0
+    err = capsys.readouterr().err
+    assert "make up && make ingest" in err
+    assert "Traceback" not in err
     assert not (tmp_path / "eval/report.json").exists()
     assert not (tmp_path / "eval/report.md").exists()

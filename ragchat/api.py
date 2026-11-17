@@ -13,7 +13,9 @@ from pydantic import BaseModel, Field
 from ragchat.answer import answer as answer_fn
 from ragchat.config import load_settings
 from ragchat.embeddings import Embedder
+from ragchat.llm import make_client
 from ragchat.ratelimit import check_and_consume
+from ragchat.rerank import Reranker
 from ragchat.store import Store
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -24,6 +26,7 @@ app = FastAPI(title="rag-docs-chatbot", docs_url="/api/docs", openapi_url="/api/
 # `monkeypatch.setattr(api, "_store", ...)` replaces a function, not a live Store object.
 _STORE: Store | None = None
 _EMBEDDER: Embedder | None = None
+_RERANKER: Reranker | None = None
 
 
 def _settings():
@@ -44,12 +47,25 @@ def _embedder() -> Embedder:
     return _EMBEDDER
 
 
-def _answer(question: str, hits, model: str):
-    return answer_fn(question, hits, model=model)
+def _reranker() -> Reranker:
+    global _RERANKER
+    if _RERANKER is None:
+        _RERANKER = Reranker(_settings().rerank_model)
+    return _RERANKER
+
+
+def _answer(question: str, hits, model: str, fallback_model: str | None = None):
+    return answer_fn(
+        question,
+        hits,
+        client=make_client(_settings()),
+        model=model,
+        fallback_model=fallback_model,
+    )
 
 
 class ChatRequest(BaseModel):
-    question: str = Field(min_length=1, max_length=500)
+    question: str = Field(min_length=1)
     k: int | None = Field(default=None, ge=1, le=10)
 
 
@@ -66,10 +82,15 @@ def chat(body: ChatRequest, request: Request) -> dict:
         raise HTTPException(status_code=422, detail="question is empty")
 
     settings = _settings()
-    if not settings.anthropic_api_key:
+    if len(question) > settings.max_question_chars:
+        raise HTTPException(
+            status_code=422,
+            detail=f"question is longer than {settings.max_question_chars} characters",
+        )
+    if not settings.llm_api_key:
         raise HTTPException(
             status_code=503,
-            detail="No API key configured. Set ANTHROPIC_API_KEY on this server.",
+            detail=f"No API key configured. Set {settings.llm_key_env} on this server.",
         )
 
     # Prefer the header the platform sets itself; a client can send its own
@@ -85,8 +106,19 @@ def chat(body: ChatRequest, request: Request) -> dict:
 
     k = min(body.k or settings.top_k, 10)
     vector = _embedder().embed([question])[0]
-    hits = _store().search(vector, k=k)
-    result = _answer(question, hits, settings.model)
+    if settings.rerank_enabled:
+        hits = _store().search(
+            vector,
+            k=settings.rerank_candidates,
+            query=question,
+            hybrid=settings.hybrid_enabled,
+        )
+        hits = _reranker().rerank(question, hits, k)
+    else:
+        hits = _store().search(
+            vector, k=k, query=question, hybrid=settings.hybrid_enabled
+        )
+    result = _answer(question, hits, settings.model, settings.fallback_model)
     return {
         "answer": result.text,
         "citations": [
