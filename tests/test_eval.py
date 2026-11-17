@@ -447,12 +447,12 @@ def test_preflight_rejects_a_golden_file_with_no_chunks(tmp_path):
 
 def test_main_fails_fast_without_an_api_key(monkeypatch, tmp_path, capsys):
     monkeypatch.chdir(tmp_path)
-    settings = SimpleNamespace(anthropic_api_key="", database_url="x",
-                               model="m", top_k=5)
+    settings = SimpleNamespace(llm_api_key="", llm_key_env="OLLAMA_API_KEY",
+                               database_url="x", model="m", top_k=5)
     monkeypatch.setattr("ragchat.config.load_settings", lambda: settings)
 
     assert main(["run_eval"]) == 1
-    assert "ANTHROPIC_API_KEY" in capsys.readouterr().err
+    assert "OLLAMA_API_KEY" in capsys.readouterr().err
     assert not (tmp_path / "eval/report.json").exists()
     assert not (tmp_path / "eval/report.md").exists()
 
@@ -461,8 +461,8 @@ def test_main_writes_no_report_when_preflight_fails(monkeypatch, tmp_path, capsy
     monkeypatch.chdir(tmp_path)
     (tmp_path / "eval").mkdir()
     (tmp_path / "eval/golden.jsonl").write_text("", encoding="utf-8")
-    settings = SimpleNamespace(anthropic_api_key="key", database_url="x",
-                               model="m", top_k=5)
+    settings = SimpleNamespace(llm_api_key="key", llm_key_env="OLLAMA_API_KEY",
+                               database_url="x", model="m", top_k=5)
     monkeypatch.setattr("ragchat.config.load_settings", lambda: settings)
     monkeypatch.setattr("ragchat.eval.run_eval.Store", lambda url: _PreflightStore(0))
 
@@ -479,8 +479,8 @@ def test_main_exits_with_a_hint_when_the_database_is_unreachable(
     monkeypatch.chdir(tmp_path)
     (tmp_path / "eval").mkdir()
     (tmp_path / "eval/golden.jsonl").write_text("", encoding="utf-8")
-    settings = SimpleNamespace(anthropic_api_key="key", database_url="x",
-                               model="m", top_k=5)
+    settings = SimpleNamespace(llm_api_key="key", llm_key_env="OLLAMA_API_KEY",
+                               database_url="x", model="m", top_k=5)
     monkeypatch.setattr("ragchat.config.load_settings", lambda: settings)
 
     class _UnreachableStore:

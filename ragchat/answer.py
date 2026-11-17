@@ -67,9 +67,10 @@ def answer(
     if not hits:
         return Answer(text=REFUSAL, citations=[], used_hits=[])
     if client is None:
-        import anthropic
+        from ragchat.config import load_settings
+        from ragchat.llm import make_client
 
-        client = anthropic.Anthropic()
+        client = make_client(load_settings())
     response = client.messages.create(
         model=model,
         max_tokens=700,

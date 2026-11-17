@@ -133,7 +133,7 @@ Corpus: {total_chunks} chunks across the golden files ({per_file}) · k = {resul
 |---|---|---|---|---|
 {rows}
 
-Reproduce with `make eval` (needs `ANTHROPIC_API_KEY` and an ingested corpus).
+Reproduce with `make eval` (needs `OLLAMA_API_KEY` (or `ANTHROPIC_API_KEY` with LLM_PROVIDER=anthropic) and an ingested corpus).
 """
 
 
@@ -187,13 +187,12 @@ def preflight(golden_path: Path, store: Store) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    from anthropic import Anthropic
-
     from ragchat.config import load_settings
+    from ragchat.llm import make_client
 
     settings = load_settings()
-    if not settings.anthropic_api_key:
-        print("ANTHROPIC_API_KEY is not set; set ANTHROPIC_API_KEY to run the eval.",
+    if not settings.llm_api_key:
+        print(f"{settings.llm_key_env} is not set; set {settings.llm_key_env} to run the eval.",
               file=sys.stderr)
         return 1
 
@@ -214,7 +213,7 @@ def main(argv: list[str]) -> int:
         for item in items
     }
     results = run_eval(golden_path, store, Embedder(),
-                       Anthropic(api_key=settings.anthropic_api_key),
+                       make_client(settings),
                        settings.model, k=settings.top_k)
     Path("eval/report.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     Path("eval/report.md").write_text(

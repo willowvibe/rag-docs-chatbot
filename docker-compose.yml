@@ -18,12 +18,15 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql://rag:rag@db:5432/rag
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-https://ollama.com}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-0}
       UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL:-}
       UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:-}
-      RAG_MODEL: ${RAG_MODEL:-claude-sonnet-5-5}
-      RAG_CHEAP_MODEL: ${RAG_CHEAP_MODEL:-claude-haiku-5-5}
+      RAG_MODEL: ${RAG_MODEL:-}
+      RAG_CHEAP_MODEL: ${RAG_CHEAP_MODEL:-}
       RAG_TOP_K: ${RAG_TOP_K:-5}
       MAX_QUESTION_CHARS: ${MAX_QUESTION_CHARS:-500}
       PER_IP_PER_HOUR: ${PER_IP_PER_HOUR:-20}

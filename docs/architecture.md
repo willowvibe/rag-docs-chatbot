@@ -1,7 +1,7 @@
 # Architecture
 
 Two flows share one local embedding model and one Postgres table. Ingest writes page-tagged
-chunks into pgvector; a query embeds the question, retrieves the nearest chunks, asks Claude
+chunks into pgvector; a query embeds the question, retrieves the nearest chunks, asks the LLM (Ollama Cloud by default, Anthropic Claude optional)
 to answer from those chunks only, and maps the `[n]` markers back to sources.
 
 ```mermaid
@@ -18,7 +18,7 @@ flowchart LR
         QE --> S[search pgvector cosine top k]
         E --> S
         S --> P[prompt numbered sources + rules]
-        P --> M[Claude answer]
+        P --> M[LLM answer]
         M --> CP[parse n markers into citations]
         CP --> R[answer + citations]
     end
@@ -46,7 +46,7 @@ flowchart LR
 3. **Prompt.** `ragchat/answer.py` numbers the retrieved chunks `[1]..[n]` and sends them,
    plus the question, with a system prompt that allows only those sources and requires a
    citation for every factual claim.
-4. **Answer.** Claude returns text. If retrieval found no chunks, the code returns the refusal
+4. **Answer.** The LLM returns text (`ragchat/llm.py` picks Ollama Cloud or Anthropic from `LLM_PROVIDER`). If retrieval found no chunks, the code returns the refusal
    immediately instead of calling the model.
 5. **Citation parse.** `parse_citations` scans the answer for `[n]` markers and keeps only
    in-range, distinct numbers. Each surviving marker becomes a citation containing the
@@ -56,7 +56,7 @@ flowchart LR
 
 `fastembed` downloads the BGE model once and then runs on the machine. Query embedding needs
 no API key and no network after that first download, which keeps retrieval cheap and fast,
-makes tests hermetic, and leaves the Anthropic key for answer generation only.
+makes tests hermetic, and leaves the LLM key for answer generation only.
 
 ## Why citations are parsed from `[n]`
 
@@ -69,7 +69,7 @@ therefore degrades to an uncited claim, not an error.
 
 ## Two key lanes
 
-- **Self-host (own key).** Run locally or in Docker with your own `ANTHROPIC_API_KEY`.
+- **Self-host (own key).** Run locally or in Docker with your own `OLLAMA_API_KEY` (or `ANTHROPIC_API_KEY` with `LLM_PROVIDER=anthropic`).
   Rate limiting is off by default (`RATE_LIMIT_ENABLED=0`).
 - **Hosted demo (owner key).** The owner's key lives in the server environment and is never
   sent to the browser. The demo sets `RATE_LIMIT_ENABLED=1`, backed by Upstash Redis, with a

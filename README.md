@@ -8,14 +8,16 @@ the retrieval pipeline ships with an eval harness so the numbers can be regenera
 a fresh clone.
 
 **Status:** pre-release. What works today: PDF, Markdown and HTML ingestion; local BGE
-embeddings; pgvector storage and cosine search; Claude answers grounded in retrieved
-passages with `[n]` citations and an explicit refusal; a rate-limited FastAPI service and
+embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud (configurable
+model, default `gpt-oss:120b`) grounded in retrieved passages with `[n]` citations and an
+explicit refusal; a rate-limited FastAPI service and
 web UI; a 30-question eval harness; a Docker quickstart; and CI. The published eval
 report, a demo video and a live demo are coming.
 
 ## Quick start
 
-Requires Docker and Python 3.12. Answering needs an `ANTHROPIC_API_KEY`; ingestion,
+Requires Docker and Python 3.12. Answering needs an `OLLAMA_API_KEY` (Ollama Cloud), or an `ANTHROPIC_API_KEY` with
+`LLM_PROVIDER=anthropic`; ingestion,
 retrieval and the tests work without one.
 
 ```bash
@@ -35,7 +37,7 @@ See [docs/architecture.md](docs/architecture.md) for the ingest and query paths.
 ## Configuration
 
 Every environment read lives in `ragchat/config.py`. Copy `.env.example` to `.env` and
-fill in what you need; the app runs without an Anthropic key for tests and offline work.
+fill in what you need; the app runs without an LLM key for tests and offline work.
 Rate limiting (the demo lane) is off by default and, when enabled, requires the Upstash
 REST URL.
 
@@ -46,9 +48,12 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 |---|---|
 | `DATABASE_URL` | `postgresql://rag:rag@localhost:5433/rag` |
 | `RAG_DB_PORT` | `5433` |
-| `ANTHROPIC_API_KEY` | empty |
-| `RAG_MODEL` | `claude-sonnet-5-5` |
-| `RAG_CHEAP_MODEL` | `claude-haiku-5-5` |
+| `LLM_PROVIDER` | `ollama` (or `anthropic`) |
+| `OLLAMA_API_KEY` | empty |
+| `OLLAMA_HOST` | `https://ollama.com` |
+| `ANTHROPIC_API_KEY` | empty (only with `LLM_PROVIDER=anthropic`) |
+| `RAG_MODEL` | `gpt-oss:120b` (anthropic: `claude-sonnet-5-5`) |
+| `RAG_CHEAP_MODEL` | `gpt-oss:20b` (anthropic: `claude-haiku-5-5`) |
 | `RAG_TOP_K` | `5` |
 | `MAX_QUESTION_CHARS` | `500` |
 | `RATE_LIMIT_ENABLED` | `0` |
@@ -60,7 +65,7 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 ## Deploy
 
 The app runs in two lanes. **Self-host** means running it locally or in Docker with your
-own `ANTHROPIC_API_KEY`. **Hosted demo** means running it on Vercel, where the owner's key
+own `OLLAMA_API_KEY` (or Anthropic key). **Hosted demo** means running it on Vercel, where the owner's key
 lives in the project's environment variables — never in the browser — and per-IP and
 per-day limits backstop it. `RATE_LIMIT_ENABLED` ships as `0`; only the demo deployment
 sets it to `1`.
@@ -78,7 +83,7 @@ inside the deployment.
 
 Set these in the Vercel project settings:
 
-- `ANTHROPIC_API_KEY`
+- `OLLAMA_API_KEY` (or `LLM_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY`)
 - `DATABASE_URL`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`

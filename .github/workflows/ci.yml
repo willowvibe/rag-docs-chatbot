@@ -19,6 +19,7 @@ jobs:
           --health-interval 3s --health-timeout 3s --health-retries 20
     env:
       DATABASE_URL: postgresql://rag:rag@localhost:5433/rag
+      OLLAMA_API_KEY: ""
       ANTHROPIC_API_KEY: ""
     steps:
       - uses: actions/checkout@v4

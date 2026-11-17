@@ -12,6 +12,9 @@ def _no_dotenv(monkeypatch):
 def test_defaults(monkeypatch):
     for key in (
         "DATABASE_URL",
+        "LLM_PROVIDER",
+        "OLLAMA_API_KEY",
+        "OLLAMA_HOST",
         "ANTHROPIC_API_KEY",
         "RATE_LIMIT_ENABLED",
         "RAG_TOP_K",
@@ -27,8 +30,46 @@ def test_defaults(monkeypatch):
     s = load_settings()
     assert s.top_k == 5
     assert s.rate_limit_enabled is False
+    assert s.llm_provider == "ollama"
+    assert s.ollama_api_key == ""
+    assert s.ollama_host == "https://ollama.com"
+    assert s.model == "gpt-oss:120b"
+    assert s.cheap_model == "gpt-oss:20b"
+    assert s.llm_api_key == ""
+    assert s.llm_key_env == "OLLAMA_API_KEY"
+
+
+def test_anthropic_provider_uses_claude_defaults(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.delenv("RAG_MODEL", raising=False)
+    monkeypatch.delenv("RAG_CHEAP_MODEL", raising=False)
+    s = load_settings()
+    assert s.llm_provider == "anthropic"
     assert s.model == "claude-sonnet-5-5"
     assert s.cheap_model == "claude-haiku-5-5"
+    assert s.llm_key_env == "ANTHROPIC_API_KEY"
+
+
+def test_llm_key_follows_the_active_provider(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-key")
+    s = load_settings()
+    assert s.llm_api_key == "anthropic-key"
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    s = load_settings()
+    assert s.llm_api_key == "ollama-key"
+
+
+def test_invalid_provider_raises(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    with pytest.raises(RuntimeError, match="LLM_PROVIDER"):
+        load_settings()
+
+
+def test_ollama_host_strips_a_trailing_slash(monkeypatch):
+    monkeypatch.setenv("OLLAMA_HOST", "https://example.invalid/")
+    assert load_settings().ollama_host == "https://example.invalid"
 
 
 def test_env_overrides(monkeypatch):
@@ -62,6 +103,8 @@ def test_non_integer_env_value_raises(monkeypatch):
 
 
 def test_missing_key_is_not_fatal(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
     s = load_settings()
-    assert s.anthropic_api_key == ""
+    assert s.ollama_api_key == ""
+    assert s.llm_api_key == ""

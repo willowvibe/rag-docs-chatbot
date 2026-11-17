@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from ragchat.answer import answer as answer_fn
 from ragchat.config import load_settings
 from ragchat.embeddings import Embedder
+from ragchat.llm import make_client
 from ragchat.ratelimit import check_and_consume
 from ragchat.store import Store
 
@@ -45,7 +46,7 @@ def _embedder() -> Embedder:
 
 
 def _answer(question: str, hits, model: str):
-    return answer_fn(question, hits, model=model)
+    return answer_fn(question, hits, client=make_client(_settings()), model=model)
 
 
 class ChatRequest(BaseModel):
@@ -71,10 +72,10 @@ def chat(body: ChatRequest, request: Request) -> dict:
             status_code=422,
             detail=f"question is longer than {settings.max_question_chars} characters",
         )
-    if not settings.anthropic_api_key:
+    if not settings.llm_api_key:
         raise HTTPException(
             status_code=503,
-            detail="No API key configured. Set ANTHROPIC_API_KEY on this server.",
+            detail=f"No API key configured. Set {settings.llm_key_env} on this server.",
         )
 
     # Prefer the header the platform sets itself; a client can send its own

@@ -20,7 +20,11 @@ def _client(monkeypatch, reply="At least 8 characters [1]."):
     # Only the tests that reach the chat route need a key; patch the accessor so the
     # value is deterministic even when a developer `.env` has a real key.
     monkeypatch.setattr(
-        api, "_settings", lambda: replace(load_settings(), anthropic_api_key="sk-test")
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(), llm_provider="ollama", ollama_api_key="sk-test"
+        ),
     )
     monkeypatch.setattr(api, "_store", lambda: FakeStore())
     monkeypatch.setattr(api, "_embedder", lambda: type("E", (), {"embed": lambda self, t: [[0.0] * 384]})())
@@ -81,7 +85,10 @@ def test_chat_rejects_question_longer_than_configured_limit(monkeypatch):
         api,
         "_settings",
         lambda: replace(
-            load_settings(), anthropic_api_key="sk-test", max_question_chars=10
+            load_settings(),
+            llm_provider="ollama",
+            ollama_api_key="sk-test",
+            max_question_chars=10,
         ),
     )
     response = client.post("/api/chat", json={"question": "x" * 11})
@@ -93,9 +100,34 @@ def test_chat_returns_503_without_a_key(monkeypatch):
     `.env`, so deleting the env var alone would not guarantee an empty key."""
     client = _client(monkeypatch)
     monkeypatch.setattr(
-        api, "_settings", lambda: replace(load_settings(), anthropic_api_key="")
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(),
+            llm_provider="ollama",
+            ollama_api_key="",
+            anthropic_api_key="",
+        ),
     )
-    assert client.post("/api/chat", json={"question": "q"}).status_code == 503
+    response = client.post("/api/chat", json={"question": "q"})
+    assert response.status_code == 503
+    assert "OLLAMA_API_KEY" in response.json()["detail"]
+
+
+def test_answer_seam_receives_the_made_client(monkeypatch):
+    sentinel = object()
+    captured = {}
+
+    def fake_answer(question, hits, client=None, model=None):
+        captured["client"] = client
+        return Answer(text="ok", citations=[], used_hits=hits)
+
+    monkeypatch.setattr(api, "make_client", lambda settings: sentinel)
+    monkeypatch.setattr(api, "answer_fn", fake_answer)
+
+    api._answer("q", [], "m")
+
+    assert captured["client"] is sentinel
 
 
 def test_index_page_is_served(monkeypatch):
