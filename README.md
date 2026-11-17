@@ -5,7 +5,8 @@ Ask your documents, get cited answers — plus an eval score you can reproduce.
 This repository is a document-QA app over a small, public-domain corpus. Answers are
 generated from retrieved passages and carry citations back to the source document, and
 the retrieval pipeline ships with an eval harness so the numbers can be regenerated from
-a fresh clone.
+a fresh clone. Optionally, cross-encoder reranking retrieves N candidates and reorders
+them down to the top-k passages used for the answer.
 
 **Status:** pre-release. What works today: PDF, Markdown and HTML ingestion; local BGE
 embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud (configurable
@@ -57,6 +58,9 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `RAG_CHEAP_MODEL` | `glm-5.3-flash` (anthropic: `claude-haiku-5-5`) |
 | `RAG_FALLBACK_MODEL` | `deepseek-v4.1-flash:1017` (anthropic: none) |
 | `RAG_TOP_K` | `5` |
+| `RAG_RERANK` | `0` (off) |
+| `RAG_RERANK_MODEL` | `BAAI/bge-reranker-base` |
+| `RAG_RERANK_CANDIDATES` | `20` |
 | `MAX_QUESTION_CHARS` | `500` |
 | `RATE_LIMIT_ENABLED` | `0` |
 | `PER_IP_PER_HOUR` | `20` |

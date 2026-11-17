@@ -12,6 +12,7 @@ import psycopg
 from ragchat.answer import answer as answer_fn
 from ragchat.embeddings import Embedder
 from ragchat.eval.validate_golden import EXPECTED_ITEMS, load_golden
+from ragchat.rerank import Reranker
 from ragchat.store import Store
 
 JUDGE_SYSTEM = """You grade whether an answer is supported by its sources.
@@ -43,7 +44,8 @@ def _judge(client, model: str, question: str, answer_text: str,
 
 
 def run_eval(golden_path: Path, store: Store, embedder: Embedder, client,
-             model: str, k: int = 5) -> dict:
+             model: str, k: int = 5, reranker=None,
+             candidates: int | None = None) -> dict:
     items = load_golden(golden_path)
     hits_ok = 0
     rr_total = 0.0
@@ -56,7 +58,10 @@ def run_eval(golden_path: Path, store: Store, embedder: Embedder, client,
     for item in items:
         gold_name = Path(item["file"]).name
         vector = embedder.embed([item["question"]])[0]
-        hits = store.search(vector, k=k)
+        search_k = candidates if reranker is not None and candidates is not None else k
+        hits = store.search(vector, k=search_k)
+        if reranker is not None:
+            hits = reranker.rerank(item["question"], hits, k)
         rank = next((i for i, h in enumerate(hits, start=1)
                      if Path(h.file).name == gold_name and h.page == item["page"]), None)
         hit = rank is not None
@@ -94,7 +99,8 @@ def run_eval(golden_path: Path, store: Store, embedder: Embedder, client,
     }
 
 
-def render_markdown(results: dict, model: str, file_counts: dict[str, int]) -> str:
+def render_markdown(results: dict, model: str, file_counts: dict[str, int],
+                    reranker_model: str | None = None) -> str:
     row_lines = []
     for q in results["per_question"]:
         faith = "-" if q["faithfulness"] is None else f"{q['faithfulness']:.2f}"
@@ -117,7 +123,7 @@ def render_markdown(results: dict, model: str, file_counts: dict[str, int]) -> s
         )
     return f"""# Retrieval and faithfulness eval
 
-Corpus: {total_chunks} chunks across the golden files ({per_file}) · k = {results['k']} · answer model: `{model}` · questions: {results['n']}
+Corpus: {total_chunks} chunks across the golden files ({per_file}) · k = {results['k']} · reranker: {f'`{reranker_model}`' if reranker_model else 'none'} · answer model: `{model}` · questions: {results['n']}
 
 | Metric | Value |
 |---|---|
@@ -187,7 +193,7 @@ def preflight(golden_path: Path, store: Store) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    from ragchat.config import load_settings
+    from ragchat.config import DEFAULT_RERANK_MODEL, load_settings
     from ragchat.llm import make_client
 
     settings = load_settings()
@@ -212,12 +218,24 @@ def main(argv: list[str]) -> int:
         Path(item["file"]).name: store.count_for_file(Path(item["file"]).name)
         for item in items
     }
+    rerank_enabled = getattr(settings, "rerank_enabled", False)
+    rerank_model = (
+        getattr(settings, "rerank_model", None) or DEFAULT_RERANK_MODEL
+        if rerank_enabled
+        else None
+    )
+    reranker = Reranker(rerank_model) if rerank_enabled else None
+    candidates = getattr(settings, "rerank_candidates", None) if rerank_enabled else None
     results = run_eval(golden_path, store, Embedder(),
                        make_client(settings),
-                       settings.model, k=settings.top_k)
+                       settings.model, k=settings.top_k, reranker=reranker,
+                       candidates=candidates)
     Path("eval/report.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     Path("eval/report.md").write_text(
-        render_markdown(results, settings.model, file_counts), encoding="utf-8")
+        render_markdown(results, settings.model, file_counts,
+                        reranker_model=rerank_model),
+        encoding="utf-8",
+    )
     print(json.dumps({k: v for k, v in results.items() if k != "per_question"}, indent=2))
     return 0
 

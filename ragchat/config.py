@@ -18,6 +18,8 @@ DEFAULT_FALLBACK_MODELS = {
     "anthropic": "",
 }
 
+DEFAULT_RERANK_MODEL = "BAAI/bge-reranker-base"
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -33,6 +35,9 @@ class Settings:
     per_ip_per_hour: int
     daily_cap: int
     top_k: int
+    rerank_enabled: bool
+    rerank_model: str
+    rerank_candidates: int
     max_question_chars: int
     upstash_redis_rest_url: str
     upstash_redis_rest_token: str
@@ -85,6 +90,13 @@ def load_settings() -> Settings:
     upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "").strip()
     if rate_limit_enabled and not upstash_url:
         raise RuntimeError("RATE_LIMIT_ENABLED=1 requires UPSTASH_REDIS_REST_URL to be set.")
+    top_k = _env_int("RAG_TOP_K", 5)
+    rerank_candidates = _env_int("RAG_RERANK_CANDIDATES", 20)
+    if rerank_candidates < top_k:
+        raise RuntimeError(
+            "RAG_RERANK_CANDIDATES must be >= RAG_TOP_K, "
+            f"got {rerank_candidates} and {top_k}"
+        )
     return Settings(
         database_url=os.environ.get("DATABASE_URL", "postgresql://rag:rag@localhost:5433/rag"),
         llm_provider=llm_provider,
@@ -99,7 +111,12 @@ def load_settings() -> Settings:
         rate_limit_enabled=rate_limit_enabled,
         per_ip_per_hour=_env_int("PER_IP_PER_HOUR", 20),
         daily_cap=_env_int("DAILY_CAP", 500),
-        top_k=_env_int("RAG_TOP_K", 5),
+        top_k=top_k,
+        rerank_enabled=_env_flag("RAG_RERANK", False),
+        rerank_model=(
+            os.environ.get("RAG_RERANK_MODEL", "").strip() or DEFAULT_RERANK_MODEL
+        ),
+        rerank_candidates=rerank_candidates,
         max_question_chars=_env_int("MAX_QUESTION_CHARS", 500),
         upstash_redis_rest_url=upstash_url,
         upstash_redis_rest_token=upstash_token,

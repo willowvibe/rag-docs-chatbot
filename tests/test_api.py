@@ -56,6 +56,63 @@ def test_chat_returns_answer_and_citations(monkeypatch):
     assert "elapsed_ms" in body
 
 
+def test_chat_with_rerank_searches_candidates_and_passes_reranked_top_k_to_answer(
+    monkeypatch,
+):
+    client = _client(monkeypatch)
+    hits = [
+        Hit(file=f"{name}.pdf", page=i, chunk_index=0, text=name, score=0.5)
+        for i, name in enumerate(["a", "b", "c"], start=1)
+    ]
+    searched = {}
+    reranked = {}
+    answered = {}
+
+    class RecordingStore:
+        def count(self):
+            return 42
+
+        def search(self, vector, k=5):
+            searched["k"] = k
+            return hits
+
+    class FakeReranker:
+        def rerank(self, query, candidates, top_k):
+            reranked["query"] = query
+            reranked["candidates"] = list(candidates)
+            reranked["top_k"] = top_k
+            return list(reversed(candidates))[:top_k]
+
+    def fake_answer(question, selected, model, fallback_model=None):
+        answered["hits"] = list(selected)
+        return Answer(text="ok", citations=[], used_hits=selected)
+
+    monkeypatch.setattr(
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(),
+            llm_provider="ollama",
+            ollama_api_key="sk-test",
+            rerank_enabled=True,
+            rerank_candidates=20,
+            top_k=5,
+        ),
+    )
+    monkeypatch.setattr(api, "_store", lambda: RecordingStore())
+    monkeypatch.setattr(api, "_reranker", lambda: FakeReranker())
+    monkeypatch.setattr(api, "_answer", fake_answer)
+
+    response = client.post("/api/chat", json={"question": "How long?", "k": 2})
+
+    assert response.status_code == 200
+    assert searched["k"] == 20
+    assert reranked["query"] == "How long?"
+    assert reranked["candidates"] == hits
+    assert reranked["top_k"] == 2
+    assert answered["hits"] == list(reversed(hits))[:2]
+
+
 def test_chat_returns_the_rate_limit_detail_when_blocked(monkeypatch):
     client = _client(monkeypatch)
     monkeypatch.setattr(api, "check_and_consume", lambda ip: (False, 0))

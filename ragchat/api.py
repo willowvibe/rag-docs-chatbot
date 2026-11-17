@@ -15,6 +15,7 @@ from ragchat.config import load_settings
 from ragchat.embeddings import Embedder
 from ragchat.llm import make_client
 from ragchat.ratelimit import check_and_consume
+from ragchat.rerank import Reranker
 from ragchat.store import Store
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -25,6 +26,7 @@ app = FastAPI(title="rag-docs-chatbot", docs_url="/api/docs", openapi_url="/api/
 # `monkeypatch.setattr(api, "_store", ...)` replaces a function, not a live Store object.
 _STORE: Store | None = None
 _EMBEDDER: Embedder | None = None
+_RERANKER: Reranker | None = None
 
 
 def _settings():
@@ -43,6 +45,13 @@ def _embedder() -> Embedder:
     if _EMBEDDER is None:
         _EMBEDDER = Embedder()
     return _EMBEDDER
+
+
+def _reranker() -> Reranker:
+    global _RERANKER
+    if _RERANKER is None:
+        _RERANKER = Reranker(_settings().rerank_model)
+    return _RERANKER
 
 
 def _answer(question: str, hits, model: str, fallback_model: str | None = None):
@@ -97,7 +106,11 @@ def chat(body: ChatRequest, request: Request) -> dict:
 
     k = min(body.k or settings.top_k, 10)
     vector = _embedder().embed([question])[0]
-    hits = _store().search(vector, k=k)
+    if settings.rerank_enabled:
+        hits = _store().search(vector, k=settings.rerank_candidates)
+        hits = _reranker().rerank(question, hits, k)
+    else:
+        hits = _store().search(vector, k=k)
     result = _answer(question, hits, settings.model, settings.fallback_model)
     return {
         "answer": result.text,

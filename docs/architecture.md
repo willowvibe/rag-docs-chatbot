@@ -42,13 +42,18 @@ flowchart LR
 1. **Embed.** The question goes through the same local embedder as ingest, so query and
    document vectors share one space.
 2. **Search.** `Store.search` orders by cosine distance (`<=>`) and returns the top `k`
-   chunks (`RAG_TOP_K`, default 5; the request may override it up to 10).
-3. **Prompt.** `ragchat/answer.py` numbers the retrieved chunks `[1]..[n]` and sends them,
+   chunks (`RAG_TOP_K`, default 5; the request may override it up to 10). When reranking is
+   enabled, the search instead fetches `RAG_RERANK_CANDIDATES` chunks (default 20).
+3. **Rerank (optional).** With `RAG_RERANK` on, `ragchat/rerank.py` scores each
+   query-passage pair with a local cross-encoder (`RAG_RERANK_MODEL`, default
+   `BAAI/bge-reranker-base`) and keeps the highest-scoring `k` chunks. The model loads
+   lazily on the first reranked request, so the default path avoids the download.
+4. **Prompt.** `ragchat/answer.py` numbers the retrieved chunks `[1]..[n]` and sends them,
    plus the question, with a system prompt that allows only those sources and requires a
    citation for every factual claim.
-4. **Answer.** The LLM returns text (`ragchat/llm.py` picks Ollama Cloud or Anthropic from `LLM_PROVIDER`). If retrieval found no chunks, the code returns the refusal
+5. **Answer.** The LLM returns text (`ragchat/llm.py` picks Ollama Cloud or Anthropic from `LLM_PROVIDER`). If retrieval found no chunks, the code returns the refusal
    immediately instead of calling the model.
-5. **Citation parse.** `parse_citations` scans the answer for `[n]` markers and keeps only
+6. **Citation parse.** `parse_citations` scans the answer for `[n]` markers and keeps only
    in-range, distinct numbers. Each surviving marker becomes a citation containing the
    source file, page and a snippet.
 
@@ -78,7 +83,6 @@ therefore degrades to an uncited claim, not an error.
 ## Not implemented
 
 - Hybrid search (keyword/BM25 plus vectors)
-- Reranking
 - OCR for scanned PDFs
 - Multi-tenancy (the database holds one corpus)
 - An upload endpoint (documents are ingested from `corpus/` on the command line)
