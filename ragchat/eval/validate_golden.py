@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ragchat.ingest.parsers import parse_document
 
-EXPECTED_ITEMS = 30
+EXPECTED_ITEMS = 40
 
 _REQUIRED_FIELDS = ("id", "question", "file", "page", "evidence_phrase")
 _EXPECTED_TYPES: dict[str, type] = {

@@ -12,7 +12,7 @@ them down to the top-k passages used for the answer.
 embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud (configurable
 model, default `glm-5.3-flash`) grounded in retrieved passages with `[n]` citations and an
 explicit refusal; a rate-limited FastAPI service and
-web UI; a 30-question eval harness; a Docker quickstart; and CI. If the primary model call
+web UI; a 40-question eval harness; a Docker quickstart; and CI. If the primary model call
 fails, the API retries once on the fallback model (`RAG_FALLBACK_MODEL`). The published eval
 report, a demo video and a live demo are coming.
 
@@ -68,7 +68,7 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `UPSTASH_REDIS_REST_URL` | empty |
 | `UPSTASH_REDIS_REST_TOKEN` | empty |
 
-On the 30-question golden set graded by evidence phrase, the MiniLM reranker raised evidence MRR@5 from 0.767 to 0.818 (first-ranked passage 19 -> 22 of 30) with no loss in hit@5, at about 1.5 s per query on CPU, so it is off by default for serverless deploys.
+On the original 30 golden questions, graded by evidence phrase, the MiniLM reranker raised evidence MRR@5 from 0.767 to 0.818 (first-ranked passage 19 -> 22 of 30) with no loss in hit@5, at about 1.5 s per query on CPU, so it is off by default for serverless deploys.
 
 ## Deploy
 
