@@ -29,8 +29,6 @@ def test_defaults(monkeypatch):
         "PER_IP_PER_HOUR",
         "DAILY_CAP",
         "MAX_QUESTION_CHARS",
-        "UPSTASH_REDIS_REST_URL",
-        "UPSTASH_REDIS_REST_TOKEN",
     ):
         monkeypatch.delenv(key, raising=False)
     s = load_settings()
@@ -111,8 +109,6 @@ def test_env_overrides(monkeypatch):
     monkeypatch.setenv("RAG_HYBRID", "yes")
     monkeypatch.setenv("RATE_LIMIT_ENABLED", "1")
     monkeypatch.setenv("PER_IP_PER_HOUR", "3")
-    monkeypatch.setenv("UPSTASH_REDIS_REST_URL", "https://example.invalid")
-    monkeypatch.setenv("UPSTASH_REDIS_REST_TOKEN", "t")
     s = load_settings()
     assert s.database_url == "postgresql://x/y"
     assert s.top_k == 9
@@ -122,16 +118,11 @@ def test_env_overrides(monkeypatch):
     assert s.hybrid_enabled is True
     assert s.rate_limit_enabled is True
     assert s.per_ip_per_hour == 3
-    assert s.upstash_redis_rest_url == "https://example.invalid"
-    assert s.upstash_redis_rest_token == "t"
 
 
-def test_demo_lane_requires_redis(monkeypatch):
+def test_demo_lane_uses_the_database(monkeypatch):
     monkeypatch.setenv("RATE_LIMIT_ENABLED", "1")
-    monkeypatch.delenv("UPSTASH_REDIS_REST_URL", raising=False)
-    monkeypatch.delenv("UPSTASH_REDIS_REST_TOKEN", raising=False)
-    with pytest.raises(RuntimeError, match="UPSTASH_REDIS_REST_URL"):
-        load_settings()
+    assert load_settings().rate_limit_enabled is True
 
 
 def test_non_integer_env_value_raises(monkeypatch):
