@@ -68,7 +68,7 @@ def _judge(client, model: str, question: str, answer_text: str,
 
 def run_eval(golden_path: Path, store: Store, embedder: Embedder, client,
              model: str, k: int = 5, reranker=None,
-             candidates: int | None = None) -> dict:
+             candidates: int | None = None, hybrid: bool = False) -> dict:
     items = load_golden(golden_path)
     hits_ok = 0
     rr_total = 0.0
@@ -86,7 +86,9 @@ def run_eval(golden_path: Path, store: Store, embedder: Embedder, client,
         phrase = item["evidence_phrase"]
         vector = embedder.embed([item["question"]])[0]
         search_k = candidates if reranker is not None and candidates is not None else k
-        hits = store.search(vector, k=search_k)
+        hits = store.search(
+            vector, k=search_k, query=item["question"], hybrid=hybrid
+        )
         if reranker is not None:
             hits = reranker.rerank(item["question"], hits, k)
         rank = next((i for i, h in enumerate(hits, start=1)
@@ -144,7 +146,8 @@ def run_eval(golden_path: Path, store: Store, embedder: Embedder, client,
 
 
 def render_markdown(results: dict, model: str, file_counts: dict[str, int],
-                    reranker_model: str | None = None) -> str:
+                    reranker_model: str | None = None,
+                    hybrid: bool = False) -> str:
     row_lines = []
     for q in results["per_question"]:
         faith = "-" if q["faithfulness"] is None else f"{q['faithfulness']:.2f}"
@@ -160,6 +163,7 @@ def render_markdown(results: dict, model: str, file_counts: dict[str, int],
     per_file = "; ".join(f"{name}: {count}" for name, count in sorted(file_counts.items()))
     faithfulness = results["faithfulness"]
     faithfulness_text = "n/a" if faithfulness is None else f"{faithfulness:.2f}"
+    retrieval_mode = "hybrid" if hybrid else "vector"
     unparsed = results.get("judge_unparsed", 0)
     note = ""
     if unparsed:
@@ -176,7 +180,7 @@ def render_markdown(results: dict, model: str, file_counts: dict[str, int],
     )
     return f"""# Retrieval and faithfulness eval
 
-Corpus: {total_chunks} chunks across the golden files ({per_file}) · k = {results['k']} · reranker: {f'`{reranker_model}`' if reranker_model else 'none'} · answer model: `{model}` · questions: {results['n']}
+Corpus: {total_chunks} chunks across the golden files ({per_file}) · k = {results['k']} · retrieval: {retrieval_mode} · reranker: {f'`{reranker_model}`' if reranker_model else 'none'} · answer model: `{model}` · questions: {results['n']}
 
 | Metric | Value | Basis |
 |---|---|---|
@@ -284,14 +288,15 @@ def main(argv: list[str]) -> int:
     )
     reranker = Reranker(rerank_model) if rerank_enabled else None
     candidates = getattr(settings, "rerank_candidates", None) if rerank_enabled else None
+    hybrid = getattr(settings, "hybrid_enabled", False)
     results = run_eval(golden_path, store, Embedder(),
                        make_client(settings),
                        settings.model, k=settings.top_k, reranker=reranker,
-                       candidates=candidates)
+                       candidates=candidates, hybrid=hybrid)
     Path("eval/report.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     Path("eval/report.md").write_text(
         render_markdown(results, settings.model, file_counts,
-                        reranker_model=rerank_model),
+                        reranker_model=rerank_model, hybrid=hybrid),
         encoding="utf-8",
     )
     print(json.dumps({k: v for k, v in results.items() if k != "per_question"}, indent=2))

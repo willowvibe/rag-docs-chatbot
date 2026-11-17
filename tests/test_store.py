@@ -46,6 +46,33 @@ def test_search_returns_nearest_first(store):
 
 
 @requires_db
+def test_hybrid_search_adds_keyword_matches(store):
+    keyword_text = "zzhybridtoken keyword only"
+    chunks = [_chunk(0, keyword_text), _chunk(1, "vector nearest")]
+    vector = [1.0] + [0.0] * 383
+    vectors = [[0.0] * 383 + [1.0], vector]
+    store.replace_doc("d", chunks, vectors)
+
+    hits = store.search(vector, k=2, query="zzhybridtoken", hybrid=True)
+
+    assert keyword_text in [hit.text for hit in hits]
+    assert all(hit.score > 0 for hit in hits)
+
+
+@requires_db
+def test_hybrid_search_with_only_stopwords_falls_back_to_vector(store):
+    chunks = [_chunk(0, "zzhybridnear"), _chunk(1, "zzhybridfar")]
+    vector = [1.0] + [0.0] * 383
+    vectors = [vector, [0.0] * 383 + [1.0]]
+    store.replace_doc("d", chunks, vectors)
+
+    vector_only = store.search(vector, k=2)
+    hybrid = store.search(vector, k=2, query="the and of", hybrid=True)
+
+    assert [hit.text for hit in hybrid] == [hit.text for hit in vector_only]
+
+
+@requires_db
 def test_global_count(store):
     before = store.count()
     chunks = [_chunk(0, "alpha"), _chunk(1, "beta")]

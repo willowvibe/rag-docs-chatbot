@@ -107,10 +107,17 @@ def chat(body: ChatRequest, request: Request) -> dict:
     k = min(body.k or settings.top_k, 10)
     vector = _embedder().embed([question])[0]
     if settings.rerank_enabled:
-        hits = _store().search(vector, k=settings.rerank_candidates)
+        hits = _store().search(
+            vector,
+            k=settings.rerank_candidates,
+            query=question,
+            hybrid=settings.hybrid_enabled,
+        )
         hits = _reranker().rerank(question, hits, k)
     else:
-        hits = _store().search(vector, k=k)
+        hits = _store().search(
+            vector, k=k, query=question, hybrid=settings.hybrid_enabled
+        )
     result = _answer(question, hits, settings.model, settings.fallback_model)
     return {
         "answer": result.text,

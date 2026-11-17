@@ -38,6 +38,7 @@ class Settings:
     rerank_enabled: bool
     rerank_model: str
     rerank_candidates: int
+    hybrid_enabled: bool
     max_question_chars: int
     upstash_redis_rest_url: str
     upstash_redis_rest_token: str
@@ -117,6 +118,7 @@ def load_settings() -> Settings:
             os.environ.get("RAG_RERANK_MODEL", "").strip() or DEFAULT_RERANK_MODEL
         ),
         rerank_candidates=rerank_candidates,
+        hybrid_enabled=_env_flag("RAG_HYBRID", False),
         max_question_chars=_env_int("MAX_QUESTION_CHARS", 500),
         upstash_redis_rest_url=upstash_url,
         upstash_redis_rest_token=upstash_token,

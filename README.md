@@ -61,6 +61,7 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `RAG_RERANK` | `0` (off) |
 | `RAG_RERANK_MODEL` | `Xenova/ms-marco-MiniLM-L-12-v2` |
 | `RAG_RERANK_CANDIDATES` | `20` |
+| `RAG_HYBRID` | `0` (off) |
 | `MAX_QUESTION_CHARS` | `500` |
 | `RATE_LIMIT_ENABLED` | `0` |
 | `PER_IP_PER_HOUR` | `20` |
@@ -69,6 +70,8 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `UPSTASH_REDIS_REST_TOKEN` | empty |
 
 On the original 30 golden questions, graded by evidence phrase, the MiniLM reranker raised evidence MRR@5 from 0.767 to 0.818 (first-ranked passage 19 -> 22 of 30) with no loss in hit@5, at about 1.5 s per query on CPU, so it is off by default for serverless deploys.
+
+Hybrid search fuses vector and keyword results with reciprocal rank fusion (k=60); on the 40-question golden set, hybrid plus the MiniLM reranker raised evidence hit@5 from 0.875 to 0.925 and MRR@5 from 0.713 to 0.803 versus vector-only.
 
 ## Deploy
 

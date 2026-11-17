@@ -157,9 +157,13 @@ class _FakeStore:
             self._batches = [list(batch) for batch in hits]
         self._next = 0
         self.k_values = []
+        self.queries = []
+        self.hybrid_values = []
 
-    def search(self, vector, k=1):
+    def search(self, vector, k=1, query=None, hybrid=False):
         self.k_values.append(k)
+        self.queries.append(query)
+        self.hybrid_values.append(hybrid)
         if self._next < len(self._batches):
             batch = self._batches[self._next]
             self._next += 1
@@ -342,6 +346,26 @@ def test_run_eval_mrr_uses_the_rank(tmp_path):
     assert store.k_values == [5]
 
 
+def test_run_eval_passes_the_query_and_hybrid_flag_to_search(tmp_path):
+    golden = _write_golden(tmp_path, [_item("q1", question="How long?")])
+    store = _FakeStore([_hit("corpus/a.pdf", 2)])
+
+    run_eval(golden, store, _FakeEmbedder(), _FakeClient(), "m", k=5, hybrid=True)
+
+    assert store.queries == ["How long?"]
+    assert store.hybrid_values == [True]
+
+
+def test_run_eval_defaults_to_vector_search(tmp_path):
+    golden = _write_golden(tmp_path, [_item("q1", question="How long?")])
+    store = _FakeStore([_hit("corpus/a.pdf", 2)])
+
+    run_eval(golden, store, _FakeEmbedder(), _FakeClient(), "m", k=5)
+
+    assert store.queries == ["How long?"]
+    assert store.hybrid_values == [False]
+
+
 def test_run_eval_only_sees_the_top_k(tmp_path):
     golden = _write_golden(tmp_path, [_item(page=2)])
     hits = [_hit("corpus/a.pdf", page) for page in (9, 10, 11, 12, 13, 2)]
@@ -443,6 +467,18 @@ def test_render_markdown_reports_headline_values_and_unparsed_count(tmp_path):
     assert "| Faithfulness (LLM judge, 0–1) | **1.00** |" in markdown
     assert "100 chunks across the golden files (a.pdf: 40; b.pdf: 60)" in markdown
     assert "| Judge replies unparsed | 0 |" in markdown
+    assert "retrieval: vector" in markdown
+
+
+def test_render_markdown_names_the_hybrid_retrieval_mode(tmp_path):
+    golden = _write_golden(tmp_path, [_item("q1")])
+    results = run_eval(golden, _FakeStore([_hit("corpus/a.pdf", 2)]),
+                       _FakeEmbedder(), _FakeClient(), "m", k=5, hybrid=True)
+
+    markdown = render_markdown(results, "m", {"a.pdf": 1}, hybrid=True)
+
+    assert "retrieval: hybrid" in markdown
+    assert "reranker: none" in markdown
 
 
 def test_render_markdown_labels_evidence_and_strict_page_metrics(tmp_path):

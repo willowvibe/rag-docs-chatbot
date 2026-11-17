@@ -25,6 +25,39 @@ CREATE UNIQUE INDEX IF NOT EXISTS chunks_doc_position
     ON chunks (doc_id, page, chunk_index);
 CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw
     ON chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS chunks_text_fts
+    ON chunks USING GIN (to_tsvector('english', text));
+"""
+
+_HYBRID_SEARCH = """
+WITH semantic AS (
+    SELECT id, RANK() OVER (ORDER BY embedding <=> %s) AS r
+    FROM chunks
+    ORDER BY embedding <=> %s
+    LIMIT %s
+),
+keyword AS (
+    SELECT id, RANK() OVER (
+        ORDER BY ts_rank_cd(to_tsvector('english', text), query) DESC
+    ) AS r
+    FROM chunks,
+         (
+             SELECT NULLIF(
+                 replace(plainto_tsquery('english', %s)::text, '&', '|'), ''
+             )::tsquery AS query
+         ) AS q
+    WHERE to_tsvector('english', text) @@ query
+    ORDER BY ts_rank_cd(to_tsvector('english', text), query) DESC
+    LIMIT %s
+)
+SELECT c.file, c.page, c.chunk_index, c.text,
+       COALESCE(1.0 / (60 + semantic.r), 0)
+       + COALESCE(1.0 / (60 + keyword.r), 0) AS score
+FROM semantic
+FULL OUTER JOIN keyword ON semantic.id = keyword.id
+JOIN chunks c ON c.id = COALESCE(semantic.id, keyword.id)
+ORDER BY score DESC
+LIMIT %s
 """
 
 
@@ -73,13 +106,33 @@ class Store:
                 )
         return len(chunks)
 
-    def search(self, vector: list[float], k: int = 5) -> list[Hit]:
+    def search(
+        self,
+        vector: list[float],
+        k: int = 5,
+        query: str | None = None,
+        hybrid: bool = False,
+    ) -> list[Hit]:
         with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT file, page, chunk_index, text, 1 - (embedding <=> %s) AS score"
-                " FROM chunks ORDER BY embedding <=> %s LIMIT %s",
-                (Vector(vector), Vector(vector), k),
-            ).fetchall()
+            if hybrid and query:
+                depth = max(2 * k, 40)
+                rows = conn.execute(
+                    _HYBRID_SEARCH,
+                    (
+                        Vector(vector),
+                        Vector(vector),
+                        depth,
+                        query,
+                        depth,
+                        k,
+                    ),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT file, page, chunk_index, text, 1 - (embedding <=> %s) AS score"
+                    " FROM chunks ORDER BY embedding <=> %s LIMIT %s",
+                    (Vector(vector), Vector(vector), k),
+                ).fetchall()
         return [
             Hit(file=r[0], page=r[1], chunk_index=r[2], text=r[3], score=float(r[4]))
             for r in rows

@@ -43,7 +43,11 @@ flowchart LR
    document vectors share one space.
 2. **Search.** `Store.search` orders by cosine distance (`<=>`) and returns the top `k`
    chunks (`RAG_TOP_K`, default 5; the request may override it up to 10). When reranking is
-   enabled, the search instead fetches `RAG_RERANK_CANDIDATES` chunks (default 20).
+   enabled, the search instead fetches `RAG_RERANK_CANDIDATES` chunks (default 20). With
+   `RAG_HYBRID` on, one SQL statement also ranks chunks by Postgres full-text search
+   (`plainto_tsquery` OR-ed over the question's lexemes, scored with `ts_rank_cd`) and fuses
+   the two ranked lists with reciprocal rank fusion (k=60). An empty keyword query, such as
+   one made only of stopwords, still returns the vector results.
 3. **Rerank (optional).** With `RAG_RERANK` on, `ragchat/rerank.py` scores each
    query-passage pair with a local cross-encoder (`RAG_RERANK_MODEL`, default
    `Xenova/ms-marco-MiniLM-L-12-v2`) and keeps the highest-scoring `k` chunks. The model loads
@@ -82,7 +86,6 @@ therefore degrades to an uncited claim, not an error.
 
 ## Not implemented
 
-- Hybrid search (keyword/BM25 plus vectors)
 - OCR for scanned PDFs
 - Multi-tenancy (the database holds one corpus)
 - An upload endpoint (documents are ingested from `corpus/` on the command line)

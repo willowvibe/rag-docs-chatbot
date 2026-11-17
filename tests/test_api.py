@@ -12,7 +12,7 @@ class FakeStore:
     def count(self):
         return 42
 
-    def search(self, vector, k=5):
+    def search(self, vector, k=5, query=None, hybrid=False):
         return [Hit(file="a.pdf", page=3, chunk_index=0, text="eight characters", score=0.9)]
 
 
@@ -72,8 +72,10 @@ def test_chat_with_rerank_searches_candidates_and_passes_reranked_top_k_to_answe
         def count(self):
             return 42
 
-        def search(self, vector, k=5):
+        def search(self, vector, k=5, query=None, hybrid=False):
             searched["k"] = k
+            searched["query"] = query
+            searched["hybrid"] = hybrid
             return hits
 
     class FakeReranker:
@@ -97,6 +99,7 @@ def test_chat_with_rerank_searches_candidates_and_passes_reranked_top_k_to_answe
             rerank_enabled=True,
             rerank_candidates=20,
             top_k=5,
+            hybrid_enabled=True,
         ),
     )
     monkeypatch.setattr(api, "_store", lambda: RecordingStore())
@@ -107,10 +110,45 @@ def test_chat_with_rerank_searches_candidates_and_passes_reranked_top_k_to_answe
 
     assert response.status_code == 200
     assert searched["k"] == 20
+    assert searched["query"] == "How long?"
+    assert searched["hybrid"] is True
     assert reranked["query"] == "How long?"
     assert reranked["candidates"] == hits
     assert reranked["top_k"] == 2
     assert answered["hits"] == list(reversed(hits))[:2]
+
+
+def test_chat_passes_query_and_hybrid_flag_to_search(monkeypatch):
+    client = _client(monkeypatch)
+    searched = {}
+
+    class RecordingStore:
+        def count(self):
+            return 42
+
+        def search(self, vector, k=5, query=None, hybrid=False):
+            searched["k"] = k
+            searched["query"] = query
+            searched["hybrid"] = hybrid
+            return [Hit(file="a.pdf", page=3, chunk_index=0, text="t", score=0.9)]
+
+    monkeypatch.setattr(
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(),
+            llm_provider="ollama",
+            ollama_api_key="sk-test",
+            hybrid_enabled=True,
+            top_k=5,
+        ),
+    )
+    monkeypatch.setattr(api, "_store", lambda: RecordingStore())
+
+    response = client.post("/api/chat", json={"question": "How long?"})
+
+    assert response.status_code == 200
+    assert searched == {"k": 5, "query": "How long?", "hybrid": True}
 
 
 def test_chat_returns_the_rate_limit_detail_when_blocked(monkeypatch):

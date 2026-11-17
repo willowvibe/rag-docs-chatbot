@@ -24,6 +24,7 @@ def test_defaults(monkeypatch):
         "RAG_RERANK",
         "RAG_RERANK_MODEL",
         "RAG_RERANK_CANDIDATES",
+        "RAG_HYBRID",
         "PER_IP_PER_HOUR",
         "DAILY_CAP",
         "MAX_QUESTION_CHARS",
@@ -36,6 +37,7 @@ def test_defaults(monkeypatch):
     assert s.rerank_enabled is False
     assert s.rerank_model == "Xenova/ms-marco-MiniLM-L-12-v2"
     assert s.rerank_candidates == 20
+    assert s.hybrid_enabled is False
     assert s.rate_limit_enabled is False
     assert s.llm_provider == "ollama"
     assert s.ollama_api_key == ""
@@ -99,6 +101,7 @@ def test_env_overrides(monkeypatch):
     monkeypatch.setenv("RAG_RERANK", "yes")
     monkeypatch.setenv("RAG_RERANK_MODEL", "Xenova/ms-marco-MiniLM-L-6-v2")
     monkeypatch.setenv("RAG_RERANK_CANDIDATES", "30")
+    monkeypatch.setenv("RAG_HYBRID", "yes")
     monkeypatch.setenv("RATE_LIMIT_ENABLED", "1")
     monkeypatch.setenv("PER_IP_PER_HOUR", "3")
     monkeypatch.setenv("UPSTASH_REDIS_REST_URL", "https://example.invalid")
@@ -109,6 +112,7 @@ def test_env_overrides(monkeypatch):
     assert s.rerank_enabled is True
     assert s.rerank_model == "Xenova/ms-marco-MiniLM-L-6-v2"
     assert s.rerank_candidates == 30
+    assert s.hybrid_enabled is True
     assert s.rate_limit_enabled is True
     assert s.per_ip_per_hour == 3
     assert s.upstash_redis_rest_url == "https://example.invalid"
@@ -146,6 +150,12 @@ def test_non_integer_rerank_candidates_raises(monkeypatch):
 def test_rerank_flag_accepts_truthy_values(monkeypatch, value):
     monkeypatch.setenv("RAG_RERANK", value)
     assert load_settings().rerank_enabled is True
+
+
+@pytest.mark.parametrize("value", ["1", "true", "YES", "on"])
+def test_hybrid_flag_accepts_truthy_values(monkeypatch, value):
+    monkeypatch.setenv("RAG_HYBRID", value)
+    assert load_settings().hybrid_enabled is True
 
 
 def test_missing_key_is_not_fatal(monkeypatch):
