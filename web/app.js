@@ -6,6 +6,7 @@
   var input = document.getElementById("question");
   var send = document.getElementById("send");
   var status = document.getElementById("status");
+  var quota = document.getElementById("quota");
   var transcript = document.getElementById("transcript");
   var sources = document.getElementById("sources");
   var emptyState = document.getElementById("empty-state");
@@ -38,7 +39,57 @@
     if (typeof payload.detail === "string") {
       return payload.detail;
     }
+    if (
+      typeof payload.detail === "object" &&
+      typeof payload.detail.message === "string"
+    ) {
+      return payload.detail.message;
+    }
     return JSON.stringify(payload.detail);
+  }
+
+  function rateLimitMessage(payload) {
+    var detail = payload && payload.detail;
+    if (detail && typeof detail === "object") {
+      if (
+        detail.reason === "per_ip" &&
+        typeof detail.limit === "number" &&
+        typeof detail.resets_in_seconds === "number"
+      ) {
+        var minutes = Math.max(1, Math.ceil(detail.resets_in_seconds / 60));
+        return (
+          "You've used all " +
+          detail.limit +
+          " questions this hour. Try again in " +
+          minutes +
+          " min."
+        );
+      }
+      if (detail.reason === "daily") {
+        return "The demo's daily question limit has been reached. Try again tomorrow.";
+      }
+      if (typeof detail.message === "string") {
+        return detail.message;
+      }
+    }
+    return detailText(payload) || "This demo is rate limited.";
+  }
+
+  function renderQuota(payload) {
+    if (!quota) {
+      return;
+    }
+    if (typeof payload.limit !== "number") {
+      quota.hidden = true;
+      quota.textContent = "";
+      return;
+    }
+    var remaining = typeof payload.remaining === "number" ? payload.remaining : 0;
+    // "1 of 8 questions left": the noun agrees with the limit, not the remainder.
+    var noun = payload.limit === 1 ? "question" : "questions";
+    quota.textContent =
+      remaining + " of " + payload.limit + " " + noun + " left this hour";
+    quota.hidden = false;
   }
 
   function addMessage(role, text) {
@@ -201,10 +252,10 @@
       })
       .then(function (result) {
         if (!result.response.ok) {
-          var detail = detailText(result.payload);
           if (result.response.status === 429) {
-            throw new Error(detail || "This demo is rate limited.");
+            throw new Error(rateLimitMessage(result.payload));
           }
+          var detail = detailText(result.payload);
           throw new Error(
             detail || "Request failed (" + result.response.status + ")."
           );
@@ -220,6 +271,7 @@
           "Answer ready · " + count + (count === 1 ? " source" : " sources"),
           "ok"
         );
+        renderQuota(payload);
       })
       .catch(function (error) {
         var message = error && error.message ? error.message : "Something went wrong.";

@@ -101,15 +101,16 @@ def _delete_keys(ip):
 def test_disabled_limiter_always_allows(monkeypatch):
     monkeypatch.setenv("RATE_LIMIT_ENABLED", "0")
     monkeypatch.setattr(ratelimit, "_connection", lambda: pytest.fail("no DB call"))
-    ok, remaining = ratelimit.check_and_consume("1.2.3.4")
+    ok, remaining, reason = ratelimit.check_and_consume("1.2.3.4")
     assert ok is True
     assert remaining == -1
+    assert reason is None
 
 
 def test_under_limit_returns_remaining(monkeypatch):
     fake = _enable(monkeypatch, per_ip=5, daily=100)
-    assert ratelimit.check_and_consume("1.2.3.4") == (True, 4)
-    assert ratelimit.check_and_consume("1.2.3.4") == (True, 3)
+    assert ratelimit.check_and_consume("1.2.3.4") == (True, 4, None)
+    assert ratelimit.check_and_consume("1.2.3.4") == (True, 3, None)
     assert fake.ttls[ratelimit._ip_key("1.2.3.4")] == 3700
     assert fake.ttls[ratelimit._day_key()] == 90000
 
@@ -117,8 +118,8 @@ def test_under_limit_returns_remaining(monkeypatch):
 def test_per_ip_limit_blocks_the_21st_call(monkeypatch):
     _enable(monkeypatch, per_ip=20, daily=1000)
     results = [ratelimit.check_and_consume("9.9.9.9") for _ in range(21)]
-    assert [ok for ok, _ in results[:20]] == [True] * 20
-    assert results[20] == (False, 0)
+    assert [ok for ok, _, _ in results[:20]] == [True] * 20
+    assert results[20] == (False, 0, "per_ip")
 
 
 def test_per_ip_limit_is_keyed_by_ip(monkeypatch):
@@ -134,7 +135,7 @@ def test_daily_cap_blocks_everyone(monkeypatch):
     assert [ratelimit.check_and_consume(f"10.0.0.{i}")[0] for i in range(3)] == [
         True
     ] * 3
-    assert ratelimit.check_and_consume("10.0.0.99") == (False, 0)
+    assert ratelimit.check_and_consume("10.0.0.99") == (False, 0, "daily")
 
 
 def test_ip_key_is_hashed(monkeypatch):
@@ -160,7 +161,7 @@ def test_db_increments_count_1_2_3(monkeypatch):
     try:
         counts = []
         for _ in range(3):
-            allowed, _ = ratelimit.check_and_consume(ip)
+            allowed, _, _ = ratelimit.check_and_consume(ip)
             assert allowed is True
             with _db() as conn:
                 counts.append(
@@ -193,10 +194,11 @@ def test_db_expired_row_resets_to_one(monkeypatch):
                 (key, 99),
             )
 
-        allowed, remaining = ratelimit.check_and_consume(ip)
+        allowed, remaining, reason = ratelimit.check_and_consume(ip)
 
         assert allowed is True
         assert remaining == 4
+        assert reason is None
         with _db() as conn:
             assert (
                 conn.execute(

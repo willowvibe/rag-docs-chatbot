@@ -151,15 +151,89 @@ def test_chat_passes_query_and_hybrid_flag_to_search(monkeypatch):
     assert searched == {"k": 5, "query": "How long?", "hybrid": True}
 
 
-def test_chat_returns_the_rate_limit_detail_when_blocked(monkeypatch):
+def test_chat_success_reports_the_per_ip_limit(monkeypatch):
     client = _client(monkeypatch)
-    monkeypatch.setattr(api, "check_and_consume", lambda ip: (False, 0))
+    monkeypatch.setattr(
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(),
+            llm_provider="ollama",
+            ollama_api_key="sk-test",
+            rate_limit_enabled=True,
+            per_ip_per_hour=8,
+        ),
+    )
+    monkeypatch.setattr(api, "check_and_consume", lambda ip: (True, 7, None))
+    body = client.post("/api/chat", json={"question": "q"}).json()
+    assert body["limit"] == 8
+    assert body["remaining"] == 7
+    assert 0 < body["resets_in_seconds"] <= 3600
+
+
+def test_chat_success_hides_the_limit_when_disabled(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setattr(
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(),
+            llm_provider="ollama",
+            ollama_api_key="sk-test",
+            rate_limit_enabled=False,
+        ),
+    )
+    monkeypatch.setattr(api, "check_and_consume", lambda ip: (True, -1, None))
+    body = client.post("/api/chat", json={"question": "q"}).json()
+    assert body["limit"] is None
+    assert body["remaining"] == -1
+    assert body["resets_in_seconds"] is None
+
+
+def test_chat_returns_the_per_ip_limit_when_blocked(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setattr(
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(),
+            llm_provider="ollama",
+            ollama_api_key="sk-test",
+            rate_limit_enabled=True,
+            per_ip_per_hour=8,
+        ),
+    )
+    monkeypatch.setattr(api, "check_and_consume", lambda ip: (False, 0, "per_ip"))
     response = client.post("/api/chat", json={"question": "q"})
     assert response.status_code == 429
-    assert (
-        response.json()["detail"]
-        == "This demo is rate limited. Clone the repo and run it with your own key."
+    detail = response.json()["detail"]
+    assert detail["reason"] == "per_ip"
+    assert detail["limit"] == 8
+    assert detail["message"]
+    assert 0 < detail["resets_in_seconds"] <= 3600
+
+
+def test_chat_returns_the_daily_limit_when_blocked(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setattr(
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(),
+            llm_provider="ollama",
+            ollama_api_key="sk-test",
+            rate_limit_enabled=True,
+            per_ip_per_hour=8,
+        ),
     )
+    monkeypatch.setattr(api, "check_and_consume", lambda ip: (False, 0, "daily"))
+    response = client.post("/api/chat", json={"question": "q"})
+    assert response.status_code == 429
+    detail = response.json()["detail"]
+    assert detail["reason"] == "daily"
+    assert detail["limit"] == 8
+    assert detail["message"]
+    assert 0 < detail["resets_in_seconds"] <= 86400
 
 
 def test_chat_rejects_out_of_range_k(monkeypatch):

@@ -284,6 +284,16 @@ textarea:focus {
   font-size: 0.85rem;
 }
 
+.quota {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.quota[hidden] {
+  display: none;
+}
+
 .status[data-state="busy"] {
   color: var(--primary-strong);
 }

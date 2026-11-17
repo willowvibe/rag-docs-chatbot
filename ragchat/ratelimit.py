@@ -100,11 +100,15 @@ def _consume(conn: psycopg.Connection, ip_key: str, day_key: str) -> tuple[int, 
     return used, spent_today
 
 
-def check_and_consume(ip: str) -> tuple[bool, int]:
-    """Returns (allowed, remaining_for_this_ip). remaining is -1 when limiting is off."""
+def check_and_consume(ip: str) -> tuple[bool, int, str | None]:
+    """Returns (allowed, remaining_for_this_ip, reason).
+
+    remaining is -1 and reason is None when limiting is off. When blocked, reason
+    is "daily" for the global cap or "per_ip" for the per-IP cap.
+    """
     settings = load_settings()
     if not settings.rate_limit_enabled:
-        return True, -1
+        return True, -1, None
 
     ip_key = _ip_key(ip)
     day_key = _day_key()
@@ -122,7 +126,7 @@ def check_and_consume(ip: str) -> tuple[bool, int]:
                     raise
 
     if spent_today > settings.daily_cap:
-        return False, 0
+        return False, 0, "daily"
     if used > settings.per_ip_per_hour:
-        return False, 0
-    return True, settings.per_ip_per_hour - used
+        return False, 0, "per_ip"
+    return True, settings.per_ip_per_hour - used, None
