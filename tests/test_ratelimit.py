@@ -90,6 +90,8 @@ def _db():
 def _delete_keys(ip):
     digest = hashlib.sha256(ip.encode()).hexdigest()[:32]
     with _db() as conn:
+        # A fresh database (CI) has no table until the limiter's first call.
+        conn.execute(ratelimit._SCHEMA)
         conn.execute(
             "DELETE FROM rate_counters WHERE key LIKE %s OR key = %s",
             (f"rag:ip:{digest}:%", ratelimit._day_key()),
