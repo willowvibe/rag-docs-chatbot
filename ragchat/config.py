@@ -9,8 +9,13 @@ from dotenv import load_dotenv
 
 
 DEFAULT_MODELS = {
-    "ollama": ("gpt-oss:120b", "gpt-oss:20b"),
+    "ollama": ("glm-5.3-flash", "glm-5.3-flash"),
     "anthropic": ("claude-sonnet-5-5", "claude-haiku-5-5"),
+}
+
+DEFAULT_FALLBACK_MODELS = {
+    "ollama": "deepseek-v4.1-flash:1017",
+    "anthropic": "",
 }
 
 
@@ -23,6 +28,7 @@ class Settings:
     anthropic_api_key: str
     model: str
     cheap_model: str
+    fallback_model: str
     rate_limit_enabled: bool
     per_ip_per_hour: int
     daily_cap: int
@@ -69,6 +75,11 @@ def load_settings() -> Settings:
             f"LLM_PROVIDER must be one of {sorted(DEFAULT_MODELS)}, got {llm_provider!r}"
         )
     default_model, default_cheap_model = DEFAULT_MODELS[llm_provider]
+    fallback_raw = os.environ.get("RAG_FALLBACK_MODEL", "").strip()
+    if fallback_raw.lower() in {"none", "off"}:
+        fallback_model = ""
+    else:
+        fallback_model = fallback_raw or DEFAULT_FALLBACK_MODELS[llm_provider]
     rate_limit_enabled = _env_flag("RATE_LIMIT_ENABLED", False)
     upstash_url = os.environ.get("UPSTASH_REDIS_REST_URL", "").strip()
     upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "").strip()
@@ -84,6 +95,7 @@ def load_settings() -> Settings:
         anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", "").strip(),
         model=os.environ.get("RAG_MODEL", "").strip() or default_model,
         cheap_model=os.environ.get("RAG_CHEAP_MODEL", "").strip() or default_cheap_model,
+        fallback_model=fallback_model,
         rate_limit_enabled=rate_limit_enabled,
         per_ip_per_hour=_env_int("PER_IP_PER_HOUR", 20),
         daily_cap=_env_int("DAILY_CAP", 500),

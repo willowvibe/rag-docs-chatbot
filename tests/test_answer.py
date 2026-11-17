@@ -1,4 +1,6 @@
 # tests/test_answer.py
+import pytest
+
 from ragchat.answer import answer, build_messages, parse_citations
 from ragchat.store import Hit
 
@@ -16,6 +18,21 @@ class FakeClient:
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
+        block = type("Block", (), {"type": "text", "text": self.reply})()
+        return type("Msg", (), {"content": [block]})()
+
+
+class FlakyClient:
+    def __init__(self, failures, reply):
+        self.failures = list(failures)
+        self.reply = reply
+        self.calls = []
+        self.messages = self
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.failures:
+            raise self.failures.pop(0)
         block = type("Block", (), {"type": "text", "text": self.reply})()
         return type("Msg", (), {"content": [block]})()
 
@@ -67,6 +84,86 @@ def test_answer_returns_text_and_citations():
     assert client.calls[0]["max_tokens"] == 700
 
 
+def test_answer_normalizes_bracketed_marker_with_source():
+    client = FakeClient("Passwords must be at least 8 characters 【1†corpus/a.pdf, page 4】.")
+    result = answer("How long?", HITS, client=client)
+    assert result.text == "Passwords must be at least 8 characters [1]."
+    assert [(c.file, c.page) for c in result.citations] == [("a.pdf", 4)]
+
+
+def test_answer_normalizes_bracketed_marker_with_page_only():
+    client = FakeClient("Rate limiting applies 【2†page 11】.")
+    result = answer("Rate limiting?", HITS, client=client)
+    assert result.text == "Rate limiting applies [2]."
+    assert [(c.file, c.page) for c in result.citations] == [("b.pdf", 11)]
+
+
+def test_answer_normalizes_ascii_marker_with_source_and_page():
+    client = FakeClient("Too many requests, HTTP 429 [2, api.pdf, page 11].")
+    result = answer("Rate limiting?", HITS, client=client)
+    assert result.text == "Too many requests, HTTP 429 [2]."
+    assert [(c.file, c.page) for c in result.citations] == [("b.pdf", 11)]
+
+
+def test_answer_normalizes_ascii_marker_with_dagger():
+    client = FakeClient("Rate limiting applies [2†page 11].")
+    result = answer("Rate limiting?", HITS, client=client)
+    assert result.text == "Rate limiting applies [2]."
+    assert [(c.file, c.page) for c in result.citations] == [("b.pdf", 11)]
+
+
+def test_answer_normalizes_ascii_marker_with_space_dash():
+    client = FakeClient("Rate limiting applies [2 - api.pdf].")
+    result = answer("Rate limiting?", HITS, client=client)
+    assert result.text == "Rate limiting applies [2]."
+    assert [(c.file, c.page) for c in result.citations] == [("b.pdf", 11)]
+
+
+def test_answer_normalizes_ascii_multi_number_marker_to_separate_citations():
+    client = FakeClient("Both apply [1, 2].")
+    result = answer("What applies?", HITS, client=client)
+    assert result.text == "Both apply [1][2]."
+    assert [(c.file, c.page) for c in result.citations] == [
+        ("a.pdf", 4),
+        ("b.pdf", 11),
+    ]
+
+
+def test_answer_resolves_source_only_marker_with_file_and_page():
+    client = FakeClient("Rate limiting applies [b.pdf, page 11].")
+    result = answer("Rate limiting?", HITS, client=client)
+    assert result.text == "Rate limiting applies [2]."
+    assert [(c.file, c.page) for c in result.citations] == [("b.pdf", 11)]
+
+
+def test_answer_resolves_source_only_marker_with_path_prefix():
+    client = FakeClient("Rate limiting applies [corpus/b.pdf, page 11].")
+    result = answer("Rate limiting?", HITS, client=client)
+    assert result.text == "Rate limiting applies [2]."
+    assert [(c.file, c.page) for c in result.citations] == [("b.pdf", 11)]
+
+
+def test_answer_resolves_source_only_marker_with_p_abbreviation():
+    client = FakeClient("Rate limiting applies [b.pdf p. 11].")
+    result = answer("Rate limiting?", HITS, client=client)
+    assert result.text == "Rate limiting applies [2]."
+    assert [(c.file, c.page) for c in result.citations] == [("b.pdf", 11)]
+
+
+def test_answer_leaves_unknown_source_only_marker_unchanged():
+    client = FakeClient("See [missing.pdf, page 11] and [b.pdf, page 4].")
+    result = answer("Anything?", HITS, client=client)
+    assert result.text == "See [missing.pdf, page 11] and [b.pdf, page 4]."
+    assert result.citations == []
+
+
+def test_answer_leaves_non_numeric_brackets_unchanged():
+    client = FakeClient("See [see note] for details.")
+    result = answer("Anything?", HITS, client=client)
+    assert result.text == "See [see note] for details."
+    assert result.citations == []
+
+
 def test_answer_treats_missing_markers_as_uncited():
     client = FakeClient("I don't know based on the provided documents.")
     result = answer("Unrelated?", HITS, client=client)
@@ -79,3 +176,60 @@ def test_answer_with_no_hits_does_not_call_the_model():
     result = answer("anything", [], client=client)
     assert client.calls == []
     assert result.text == "I don't know based on the provided documents."
+
+
+def test_answer_retries_with_the_fallback_model_when_the_primary_fails(caplog):
+    client = FlakyClient([RuntimeError("primary boom")], "Fallback answer [2].")
+    result = answer(
+        "Rate limiting?",
+        HITS,
+        client=client,
+        model="primary-model",
+        fallback_model="backup-model",
+    )
+
+    assert result.text == "Fallback answer [2]."
+    assert [(c.file, c.page) for c in result.citations] == [("b.pdf", 11)]
+    assert [call["model"] for call in client.calls] == ["primary-model", "backup-model"]
+    assert "primary-model" in caplog.text
+    assert "backup-model" in caplog.text
+    assert "RuntimeError" in caplog.text
+
+
+def test_answer_raises_when_the_primary_and_fallback_both_fail():
+    client = FlakyClient(
+        [RuntimeError("primary boom"), RuntimeError("fallback boom")],
+        "unused",
+    )
+    with pytest.raises(RuntimeError, match="fallback boom"):
+        answer(
+            "Rate limiting?",
+            HITS,
+            client=client,
+            model="primary-model",
+            fallback_model="backup-model",
+        )
+
+    assert [call["model"] for call in client.calls] == ["primary-model", "backup-model"]
+
+
+def test_answer_without_a_fallback_does_not_retry():
+    client = FlakyClient([RuntimeError("primary boom")], "unused")
+    with pytest.raises(RuntimeError, match="primary boom"):
+        answer("Rate limiting?", HITS, client=client, model="primary-model")
+
+    assert [call["model"] for call in client.calls] == ["primary-model"]
+
+
+def test_answer_does_not_retry_when_the_fallback_equals_the_primary():
+    client = FlakyClient([RuntimeError("primary boom")], "unused")
+    with pytest.raises(RuntimeError, match="primary boom"):
+        answer(
+            "Rate limiting?",
+            HITS,
+            client=client,
+            model="same-model",
+            fallback_model="same-model",
+        )
+
+    assert [call["model"] for call in client.calls] == ["same-model"]

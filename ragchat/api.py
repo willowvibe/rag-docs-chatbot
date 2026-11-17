@@ -45,8 +45,14 @@ def _embedder() -> Embedder:
     return _EMBEDDER
 
 
-def _answer(question: str, hits, model: str):
-    return answer_fn(question, hits, client=make_client(_settings()), model=model)
+def _answer(question: str, hits, model: str, fallback_model: str | None = None):
+    return answer_fn(
+        question,
+        hits,
+        client=make_client(_settings()),
+        model=model,
+        fallback_model=fallback_model,
+    )
 
 
 class ChatRequest(BaseModel):
@@ -92,7 +98,7 @@ def chat(body: ChatRequest, request: Request) -> dict:
     k = min(body.k or settings.top_k, 10)
     vector = _embedder().embed([question])[0]
     hits = _store().search(vector, k=k)
-    result = _answer(question, hits, settings.model)
+    result = _answer(question, hits, settings.model, settings.fallback_model)
     return {
         "answer": result.text,
         "citations": [

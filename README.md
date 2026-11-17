@@ -9,9 +9,10 @@ a fresh clone.
 
 **Status:** pre-release. What works today: PDF, Markdown and HTML ingestion; local BGE
 embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud (configurable
-model, default `gpt-oss:120b`) grounded in retrieved passages with `[n]` citations and an
+model, default `glm-5.3-flash`) grounded in retrieved passages with `[n]` citations and an
 explicit refusal; a rate-limited FastAPI service and
-web UI; a 30-question eval harness; a Docker quickstart; and CI. The published eval
+web UI; a 30-question eval harness; a Docker quickstart; and CI. If the primary model call
+fails, the API retries once on the fallback model (`RAG_FALLBACK_MODEL`). The published eval
 report, a demo video and a live demo are coming.
 
 ## Quick start
@@ -52,8 +53,9 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `OLLAMA_API_KEY` | empty |
 | `OLLAMA_HOST` | `https://ollama.com` |
 | `ANTHROPIC_API_KEY` | empty (only with `LLM_PROVIDER=anthropic`) |
-| `RAG_MODEL` | `gpt-oss:120b` (anthropic: `claude-sonnet-5-5`) |
-| `RAG_CHEAP_MODEL` | `gpt-oss:20b` (anthropic: `claude-haiku-5-5`) |
+| `RAG_MODEL` | `glm-5.3-flash` (anthropic: `claude-sonnet-5-5`) |
+| `RAG_CHEAP_MODEL` | `glm-5.3-flash` (anthropic: `claude-haiku-5-5`) |
+| `RAG_FALLBACK_MODEL` | `deepseek-v4.1-flash:1017` (anthropic: none) |
 | `RAG_TOP_K` | `5` |
 | `MAX_QUESTION_CHARS` | `500` |
 | `RATE_LIMIT_ENABLED` | `0` |

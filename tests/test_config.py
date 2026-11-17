@@ -20,6 +20,7 @@ def test_defaults(monkeypatch):
         "RAG_TOP_K",
         "RAG_MODEL",
         "RAG_CHEAP_MODEL",
+        "RAG_FALLBACK_MODEL",
         "PER_IP_PER_HOUR",
         "DAILY_CAP",
         "MAX_QUESTION_CHARS",
@@ -33,8 +34,9 @@ def test_defaults(monkeypatch):
     assert s.llm_provider == "ollama"
     assert s.ollama_api_key == ""
     assert s.ollama_host == "https://ollama.com"
-    assert s.model == "gpt-oss:120b"
-    assert s.cheap_model == "gpt-oss:20b"
+    assert s.model == "glm-5.3-flash"
+    assert s.cheap_model == "glm-5.3-flash"
+    assert s.fallback_model == "deepseek-v4.1-flash:1017"
     assert s.llm_api_key == ""
     assert s.llm_key_env == "OLLAMA_API_KEY"
 
@@ -43,11 +45,24 @@ def test_anthropic_provider_uses_claude_defaults(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "anthropic")
     monkeypatch.delenv("RAG_MODEL", raising=False)
     monkeypatch.delenv("RAG_CHEAP_MODEL", raising=False)
+    monkeypatch.delenv("RAG_FALLBACK_MODEL", raising=False)
     s = load_settings()
     assert s.llm_provider == "anthropic"
     assert s.model == "claude-sonnet-5-5"
     assert s.cheap_model == "claude-haiku-5-5"
+    assert s.fallback_model == ""
     assert s.llm_key_env == "ANTHROPIC_API_KEY"
+
+
+def test_fallback_model_env_override(monkeypatch):
+    monkeypatch.setenv("RAG_FALLBACK_MODEL", "backup-model:1")
+    assert load_settings().fallback_model == "backup-model:1"
+
+
+@pytest.mark.parametrize("value", ["none", "NONE", "off", "OFF"])
+def test_fallback_model_can_be_disabled(monkeypatch, value):
+    monkeypatch.setenv("RAG_FALLBACK_MODEL", value)
+    assert load_settings().fallback_model == ""
 
 
 def test_llm_key_follows_the_active_provider(monkeypatch):

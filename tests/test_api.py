@@ -31,7 +31,7 @@ def _client(monkeypatch, reply="At least 8 characters [1]."):
     monkeypatch.setattr(
         api,
         "_answer",
-        lambda q, hits, model: Answer(
+        lambda q, hits, model, fallback_model=None: Answer(
             text=reply,
             citations=[
                 Citation(file="a.pdf", page=3, snippet="eight characters", marker=1)
@@ -118,7 +118,7 @@ def test_answer_seam_receives_the_made_client(monkeypatch):
     sentinel = object()
     captured = {}
 
-    def fake_answer(question, hits, client=None, model=None):
+    def fake_answer(question, hits, client=None, model=None, fallback_model=None):
         captured["client"] = client
         return Answer(text="ok", citations=[], used_hits=hits)
 
