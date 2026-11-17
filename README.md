@@ -57,6 +57,7 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `RAG_MODEL` | `glm-5.3-flash` (anthropic: `claude-sonnet-5-5`) |
 | `RAG_CHEAP_MODEL` | `glm-5.3-flash` (anthropic: `claude-haiku-5-5`) |
 | `RAG_FALLBACK_MODEL` | `deepseek-v4.1-flash:1017` (anthropic: none) |
+| `RAG_THINK` | `0` (off; Ollama thinking mode is off because reasoning tokens count against the answer budget and caused empty answers) |
 | `RAG_TOP_K` | `5` |
 | `RAG_RERANK` | `0` (off; Docker Compose sets `1`) |
 | `RAG_RERANK_MODEL` | `Xenova/ms-marco-MiniLM-L-12-v2` |

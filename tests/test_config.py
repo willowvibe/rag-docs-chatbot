@@ -21,6 +21,7 @@ def test_defaults(monkeypatch):
         "RAG_MODEL",
         "RAG_CHEAP_MODEL",
         "RAG_FALLBACK_MODEL",
+        "RAG_THINK",
         "RAG_RERANK",
         "RAG_RERANK_MODEL",
         "RAG_RERANK_CANDIDATES",
@@ -45,6 +46,7 @@ def test_defaults(monkeypatch):
     assert s.model == "glm-5.3-flash"
     assert s.cheap_model == "glm-5.3-flash"
     assert s.fallback_model == "deepseek-v4.1-flash:1017"
+    assert s.llm_think is False
     assert s.llm_api_key == ""
     assert s.llm_key_env == "OLLAMA_API_KEY"
 
@@ -65,6 +67,11 @@ def test_anthropic_provider_uses_claude_defaults(monkeypatch):
 def test_fallback_model_env_override(monkeypatch):
     monkeypatch.setenv("RAG_FALLBACK_MODEL", "backup-model:1")
     assert load_settings().fallback_model == "backup-model:1"
+
+
+def test_think_env_override(monkeypatch):
+    monkeypatch.setenv("RAG_THINK", "yes")
+    assert load_settings().llm_think is True
 
 
 @pytest.mark.parametrize("value", ["none", "NONE", "off", "OFF"])
@@ -150,6 +157,12 @@ def test_non_integer_rerank_candidates_raises(monkeypatch):
 def test_rerank_flag_accepts_truthy_values(monkeypatch, value):
     monkeypatch.setenv("RAG_RERANK", value)
     assert load_settings().rerank_enabled is True
+
+
+@pytest.mark.parametrize("value", ["1", "true", "YES", "on"])
+def test_think_flag_accepts_truthy_values(monkeypatch, value):
+    monkeypatch.setenv("RAG_THINK", value)
+    assert load_settings().llm_think is True
 
 
 @pytest.mark.parametrize("value", ["1", "true", "YES", "on"])

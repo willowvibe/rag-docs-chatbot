@@ -31,6 +31,7 @@ class Settings:
     model: str
     cheap_model: str
     fallback_model: str
+    llm_think: bool
     rate_limit_enabled: bool
     per_ip_per_hour: int
     daily_cap: int
@@ -109,6 +110,7 @@ def load_settings() -> Settings:
         model=os.environ.get("RAG_MODEL", "").strip() or default_model,
         cheap_model=os.environ.get("RAG_CHEAP_MODEL", "").strip() or default_cheap_model,
         fallback_model=fallback_model,
+        llm_think=_env_flag("RAG_THINK", False),
         rate_limit_enabled=rate_limit_enabled,
         per_ip_per_hour=_env_int("PER_IP_PER_HOUR", 20),
         daily_cap=_env_int("DAILY_CAP", 500),
