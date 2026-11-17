@@ -40,8 +40,8 @@ See [docs/architecture.md](docs/architecture.md) for the ingest and query paths.
 
 Every environment read lives in `ragchat/config.py`. Copy `.env.example` to `.env` and
 fill in what you need; the app runs without an LLM key for tests and offline work.
-Rate limiting (the demo lane) is off by default and, when enabled, requires the Upstash
-REST URL.
+Rate limiting (the demo lane) is off by default; when enabled, its counters live in the
+same Postgres database.
 
 If another Postgres already holds port 5433, bring the database up on a different host port
 with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
@@ -67,8 +67,6 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `RATE_LIMIT_ENABLED` | `0` |
 | `PER_IP_PER_HOUR` | `20` |
 | `DAILY_CAP` | `500` |
-| `UPSTASH_REDIS_REST_URL` | empty |
-| `UPSTASH_REDIS_REST_TOKEN` | empty |
 
 Docker Compose turns both `RAG_HYBRID` and `RAG_RERANK` on, while the code default is off so serverless/Vercel deploys are unaffected.
 
@@ -85,8 +83,10 @@ sets it to `1`.
 Prerequisites:
 
 - A Postgres database with the `vector` extension (the Neon free tier works).
-- An Upstash Redis database, for the REST URL and token that hold the limit counters.
 - This repository imported as a Vercel project.
+
+Rate-limit counters live in a `rate_counters` table in the same Postgres, and IPs are
+stored only as truncated SHA-256 hashes.
 
 Ingest against the hosted database **before** the first request: point `DATABASE_URL` at
 it and run `make ingest`. The deployed app only reads the `chunks` table; `corpus/` and
@@ -97,15 +97,13 @@ Set these in the Vercel project settings:
 
 - `OLLAMA_API_KEY` (or `LLM_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY`)
 - `DATABASE_URL`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
 - `RATE_LIMIT_ENABLED=1` (demo only; the shipped default is `0`)
 - `PER_IP_PER_HOUR=20`
 - `DAILY_CAP=500`
 - `FASTEMBED_CACHE_PATH=/tmp/fastembed`
 
-The first four carry deployment-specific credentials; keep them in the project settings
-and out of the repository. `FASTEMBED_CACHE_PATH` is set explicitly because the function
+The API key and database URL carry deployment-specific credentials; keep them in the
+project settings and out of the repository. `FASTEMBED_CACHE_PATH` is set explicitly because the function
 filesystem is read-only apart from `/tmp`, so the model cache must live there. fastembed's
 own fallback is `/tmp/fastembed_cache`, which makes this an explicit choice rather than a
 fix for a crash.

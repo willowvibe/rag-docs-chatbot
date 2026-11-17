@@ -81,8 +81,10 @@ therefore degrades to an uncited claim, not an error.
 - **Self-host (own key).** Run locally or in Docker with your own `OLLAMA_API_KEY` (or `ANTHROPIC_API_KEY` with `LLM_PROVIDER=anthropic`).
   Rate limiting is off by default (`RATE_LIMIT_ENABLED=0`).
 - **Hosted demo (owner key).** The owner's key lives in the server environment and is never
-  sent to the browser. The demo sets `RATE_LIMIT_ENABLED=1`, backed by Upstash Redis, with a
-  per-IP hourly limit (`PER_IP_PER_HOUR`) and a daily cap (`DAILY_CAP`).
+  sent to the browser. The demo sets `RATE_LIMIT_ENABLED=1`, backed by counters in a
+  `rate_counters` table in the same Postgres, with a per-IP hourly limit
+  (`PER_IP_PER_HOUR`) and a daily cap (`DAILY_CAP`). IPs are stored only as truncated
+  SHA-256 hashes.
 
 ## Not implemented
 

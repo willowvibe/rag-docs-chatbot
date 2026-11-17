@@ -27,6 +27,13 @@ CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw
     ON chunks USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS chunks_text_fts
     ON chunks USING GIN (to_tsvector('english', text));
+CREATE TABLE IF NOT EXISTS rate_counters (
+    key        TEXT PRIMARY KEY,
+    n          INTEGER NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS rate_counters_expires_at
+    ON rate_counters (expires_at);
 """
 
 _HYBRID_SEARCH = """

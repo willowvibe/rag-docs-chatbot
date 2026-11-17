@@ -41,8 +41,6 @@ class Settings:
     rerank_candidates: int
     hybrid_enabled: bool
     max_question_chars: int
-    upstash_redis_rest_url: str
-    upstash_redis_rest_token: str
 
     @property
     def llm_api_key(self) -> str:
@@ -88,10 +86,6 @@ def load_settings() -> Settings:
     else:
         fallback_model = fallback_raw or DEFAULT_FALLBACK_MODELS[llm_provider]
     rate_limit_enabled = _env_flag("RATE_LIMIT_ENABLED", False)
-    upstash_url = os.environ.get("UPSTASH_REDIS_REST_URL", "").strip()
-    upstash_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "").strip()
-    if rate_limit_enabled and not upstash_url:
-        raise RuntimeError("RATE_LIMIT_ENABLED=1 requires UPSTASH_REDIS_REST_URL to be set.")
     top_k = _env_int("RAG_TOP_K", 5)
     rerank_candidates = _env_int("RAG_RERANK_CANDIDATES", 15)
     if rerank_candidates < top_k:
@@ -122,6 +116,4 @@ def load_settings() -> Settings:
         rerank_candidates=rerank_candidates,
         hybrid_enabled=_env_flag("RAG_HYBRID", False),
         max_question_chars=_env_int("MAX_QUESTION_CHARS", 500),
-        upstash_redis_rest_url=upstash_url,
-        upstash_redis_rest_token=upstash_token,
     )
