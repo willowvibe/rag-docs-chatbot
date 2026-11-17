@@ -4,9 +4,11 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
+import psycopg
 import pytest
 
 from ragchat.eval.run_eval import (
+    INGEST_HINT,
     JUDGE_SYSTEM,
     _judge,
     main,
@@ -418,7 +420,8 @@ def test_preflight_rejects_an_empty_store(tmp_path):
 
     problems = preflight(golden, _PreflightStore(0))
 
-    assert problems == ["store is empty; ingest the corpus before running the eval"]
+    assert problems == [f"store is empty; {INGEST_HINT}"]
+    assert "make up && make ingest" in problems[0]
 
 
 def test_preflight_rejects_a_short_golden_set(tmp_path):
@@ -463,7 +466,34 @@ def test_main_writes_no_report_when_preflight_fails(monkeypatch, tmp_path, capsy
     monkeypatch.setattr("ragchat.config.load_settings", lambda: settings)
     monkeypatch.setattr("ragchat.eval.run_eval.Store", lambda url: _PreflightStore(0))
 
-    assert main(["run_eval"]) == 1
-    assert "Preflight failed; no report written." in capsys.readouterr().err
+    with pytest.raises(SystemExit) as exc_info:
+        main(["run_eval"])
+    assert exc_info.value.code != 0
+    assert "make up && make ingest" in capsys.readouterr().err
+    assert not (tmp_path / "eval/report.json").exists()
+    assert not (tmp_path / "eval/report.md").exists()
+
+
+def test_main_exits_with_a_hint_when_the_database_is_unreachable(
+        monkeypatch, tmp_path, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "eval/golden.jsonl").write_text("", encoding="utf-8")
+    settings = SimpleNamespace(anthropic_api_key="key", database_url="x",
+                               model="m", top_k=5)
+    monkeypatch.setattr("ragchat.config.load_settings", lambda: settings)
+
+    class _UnreachableStore:
+        def count(self):
+            raise psycopg.OperationalError("connection refused")
+
+    monkeypatch.setattr("ragchat.eval.run_eval.Store", lambda url: _UnreachableStore())
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["run_eval"])
+    assert exc_info.value.code != 0
+    err = capsys.readouterr().err
+    assert "make up && make ingest" in err
+    assert "Traceback" not in err
     assert not (tmp_path / "eval/report.json").exists()
     assert not (tmp_path / "eval/report.md").exists()

@@ -23,6 +23,11 @@ services:
       UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL:-}
       UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:-}
       RAG_MODEL: ${RAG_MODEL:-claude-sonnet-5-5}
+      RAG_CHEAP_MODEL: ${RAG_CHEAP_MODEL:-claude-haiku-5-5}
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      MAX_QUESTION_CHARS: ${MAX_QUESTION_CHARS:-500}
+      PER_IP_PER_HOUR: ${PER_IP_PER_HOUR:-20}
+      DAILY_CAP: ${DAILY_CAP:-500}
     ports:
       # Host port 8000 is used by another project on some machines; override with APP_PORT.
       - "${APP_PORT:-8000}:8000"

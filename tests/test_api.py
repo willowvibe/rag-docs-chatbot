@@ -75,6 +75,19 @@ def test_chat_rejects_empty_and_overlong_questions(monkeypatch):
     assert client.post("/api/chat", json={"question": "x" * 501}).status_code == 422
 
 
+def test_chat_rejects_question_longer_than_configured_limit(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setattr(
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(), anthropic_api_key="sk-test", max_question_chars=10
+        ),
+    )
+    response = client.post("/api/chat", json={"question": "x" * 11})
+    assert response.status_code == 422
+
+
 def test_chat_returns_503_without_a_key(monkeypatch):
     """Patch the settings accessor, not the environment: `load_settings()` also reads
     `.env`, so deleting the env var alone would not guarantee an empty key."""

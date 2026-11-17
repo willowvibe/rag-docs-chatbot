@@ -49,7 +49,7 @@ def _answer(question: str, hits, model: str):
 
 
 class ChatRequest(BaseModel):
-    question: str = Field(min_length=1, max_length=500)
+    question: str = Field(min_length=1)
     k: int | None = Field(default=None, ge=1, le=10)
 
 
@@ -66,6 +66,11 @@ def chat(body: ChatRequest, request: Request) -> dict:
         raise HTTPException(status_code=422, detail="question is empty")
 
     settings = _settings()
+    if len(question) > settings.max_question_chars:
+        raise HTTPException(
+            status_code=422,
+            detail=f"question is longer than {settings.max_question_chars} characters",
+        )
     if not settings.anthropic_api_key:
         raise HTTPException(
             status_code=503,

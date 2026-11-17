@@ -5,10 +5,15 @@ COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compos
 # which has no .venv, still works.
 PYTHON ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
 
-.PHONY: up down ingest serve test lint eval validate-golden verify-corpus demo ask
+.PHONY: up down ingest serve test lint install-dev eval validate-golden verify-corpus demo ask
 
 up:
 	$(COMPOSE) up -d db
+	@for i in $$(seq 1 60); do \
+	  $(COMPOSE) exec -T db pg_isready -U rag -d rag >/dev/null 2>&1 && break; \
+	  [ $$i -eq 60 ] && echo "db never became ready; see: $(COMPOSE) logs db" && exit 1; \
+	  sleep 1; \
+	done
 
 down:
 	$(COMPOSE) down -v
@@ -24,6 +29,9 @@ test:
 
 lint:
 	$(PYTHON) -m ruff check .
+
+install-dev:
+	$(PYTHON) -m pip install -r requirements-dev.txt
 
 verify-corpus:
 	sha256sum -c corpus/SHA256SUMS

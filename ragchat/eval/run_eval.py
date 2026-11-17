@@ -7,6 +7,8 @@ import re
 import sys
 from pathlib import Path
 
+import psycopg
+
 from ragchat.answer import answer as answer_fn
 from ragchat.embeddings import Embedder
 from ragchat.eval.validate_golden import EXPECTED_ITEMS, load_golden
@@ -135,6 +137,14 @@ Reproduce with `make eval` (needs `ANTHROPIC_API_KEY` and an ingested corpus).
 """
 
 
+INGEST_HINT = "run `make up && make ingest` to prepare the database, then retry"
+
+
+def _db_problem(exc: psycopg.Error) -> str:
+    detail = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
+    return f"cannot read the chunk store ({detail}); {INGEST_HINT}"
+
+
 def preflight(golden_path: Path, store: Store) -> list[str]:
     """Refuse to produce an all-zero report from an empty or partial setup."""
     try:
@@ -149,8 +159,14 @@ def preflight(golden_path: Path, store: Store) -> list[str]:
         problems.append(
             f"golden set has {len(items)} item(s), expected {EXPECTED_ITEMS}"
         )
-    if store.count() == 0:
-        problems.append("store is empty; ingest the corpus before running the eval")
+    try:
+        total = store.count()
+    except (psycopg.OperationalError, psycopg.errors.UndefinedTable) as exc:
+        return [_db_problem(exc)]
+    except psycopg.Error as exc:
+        return [_db_problem(exc)]
+    if total == 0:
+        problems.append(f"store is empty; {INGEST_HINT}")
         return problems
 
     gold_files = sorted({
@@ -159,7 +175,13 @@ def preflight(golden_path: Path, store: Store) -> list[str]:
         if isinstance(item, dict) and isinstance(item.get("file"), str)
     })
     for name in gold_files:
-        if store.count_for_file(name) == 0:
+        try:
+            count = store.count_for_file(name)
+        except (psycopg.OperationalError, psycopg.errors.UndefinedTable) as exc:
+            return [_db_problem(exc)]
+        except psycopg.Error as exc:
+            return [_db_problem(exc)]
+        if count == 0:
             problems.append(f"no chunks in the store for {name}")
     return problems
 
@@ -176,13 +198,15 @@ def main(argv: list[str]) -> int:
         return 1
 
     golden_path = Path(argv[1]) if len(argv) > 1 else Path("eval/golden.jsonl")
-    store = Store(settings.database_url)
-    problems = preflight(golden_path, store)
+    try:
+        store = Store(settings.database_url)
+        problems = preflight(golden_path, store)
+    except psycopg.Error as exc:
+        problems = [_db_problem(exc)]
     if problems:
         for problem in problems:
             print(problem, file=sys.stderr)
-        print("Preflight failed; no report written.", file=sys.stderr)
-        return 1
+        raise SystemExit(1)
 
     items = load_golden(golden_path)
     file_counts = {

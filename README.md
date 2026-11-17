@@ -7,21 +7,30 @@ generated from retrieved passages and carry citations back to the source documen
 the retrieval pipeline ships with an eval harness so the numbers can be regenerated from
 a fresh clone.
 
-**Status:** milestone 1 scaffold. The settings module and the corpus are in place;
-ingestion, retrieval, the API and the eval arrive in later milestones.
+**Status:** pre-release. What works today: PDF, Markdown and HTML ingestion; local BGE
+embeddings; pgvector storage and cosine search; Claude answers grounded in retrieved
+passages with `[n]` citations and an explicit refusal; a rate-limited FastAPI service and
+web UI; a 30-question eval harness; a Docker quickstart; and CI. The published eval
+report, a demo video and a live demo are coming.
 
 ## Quick start
 
+Requires Docker and Python 3.12. Answering needs an `ANTHROPIC_API_KEY`; ingestion,
+retrieval and the tests work without one.
+
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -r requirements-dev.txt
 
-# Settings tests
-.venv/bin/pytest tests/test_config.py -v
+make up       # start Postgres with pgvector
+make ingest   # prints: total=386 chunks across 2 documents
+make serve    # http://localhost:8000
 
-# Verify the bundled corpus has not changed
-make verify-corpus
+# In another shell:
+make test
 ```
+
+See [docs/architecture.md](docs/architecture.md) for the ingest and query paths.
 
 ## Configuration
 
@@ -94,7 +103,7 @@ Fluid-compute default and the maximum on the Hobby plan, so it pins the default 
 than extending it; that leaves room for a cold start. If you ever want the `/api`
 file-function lane instead of the preset, set the project's Framework Preset to "Other".
 Vercel runs the Python version named in `.python-version` (3.12); the `Dockerfile` and CI
-pin 3.11, and `requirements.txt` installs on both.
+use 3.12 too, so every environment runs the same interpreter.
 
 If the Python bundle exceeds Vercel's size limit, the same `Dockerfile` runs unchanged on
 Render or Fly — which is why the app contains no Vercel-specific code.
@@ -143,7 +152,12 @@ recorded in `corpus/SHA256SUMS` and checked by `make verify-corpus`.
 
 ```
 ragchat/       application package (settings live in config.py)
+ragchat/eval/  golden-set validator and eval runner
+api/           Vercel entry point
+web/           static chat UI
 corpus/        public-domain source documents + provenance
+eval/          golden questions and generated report
+docs/          architecture notes
 tests/         pytest suite
 ```
 
