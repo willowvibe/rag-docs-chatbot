@@ -43,7 +43,7 @@ flowchart LR
    document vectors share one space.
 2. **Search.** `Store.search` orders by cosine distance (`<=>`) and returns the top `k`
    chunks (`RAG_TOP_K`, default 5; the request may override it up to 10). When reranking is
-   enabled, the search instead fetches `RAG_RERANK_CANDIDATES` chunks (default 20). With
+   enabled, the search instead fetches `RAG_RERANK_CANDIDATES` chunks (default 15). With
    `RAG_HYBRID` on, one SQL statement also ranks chunks by Postgres full-text search
    (`plainto_tsquery` OR-ed over the question's lexemes, scored with `ts_rank_cd`) and fuses
    the two ranked lists with reciprocal rank fusion (k=60). An empty keyword query, such as

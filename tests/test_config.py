@@ -36,7 +36,7 @@ def test_defaults(monkeypatch):
     assert s.top_k == 5
     assert s.rerank_enabled is False
     assert s.rerank_model == "Xenova/ms-marco-MiniLM-L-12-v2"
-    assert s.rerank_candidates == 20
+    assert s.rerank_candidates == 15
     assert s.hybrid_enabled is False
     assert s.rate_limit_enabled is False
     assert s.llm_provider == "ollama"

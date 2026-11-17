@@ -92,7 +92,7 @@ def load_settings() -> Settings:
     if rate_limit_enabled and not upstash_url:
         raise RuntimeError("RATE_LIMIT_ENABLED=1 requires UPSTASH_REDIS_REST_URL to be set.")
     top_k = _env_int("RAG_TOP_K", 5)
-    rerank_candidates = _env_int("RAG_RERANK_CANDIDATES", 20)
+    rerank_candidates = _env_int("RAG_RERANK_CANDIDATES", 15)
     if rerank_candidates < top_k:
         raise RuntimeError(
             "RAG_RERANK_CANDIDATES must be >= RAG_TOP_K, "
