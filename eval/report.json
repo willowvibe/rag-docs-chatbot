@@ -1,0 +1,414 @@
+{
+  "n": 40,
+  "k": 5,
+  "hit_at_k": 0.9,
+  "mrr": 0.719,
+  "grounding_rate": 0.875,
+  "evidence_hit_at_k": 0.875,
+  "evidence_mrr": 0.713,
+  "evidence_grounding_rate": 0.875,
+  "faithfulness": 0.975,
+  "judge_unparsed": 0,
+  "per_question": [
+    {
+      "id": "q01",
+      "hit": true,
+      "rank": 2,
+      "evidence_rank": 2,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "Verifiers and CSPs SHALL require passwords used as a single-factor authentication mechanism to be a minimum of 15 characters in length [2]."
+    },
+    {
+      "id": "q02",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "At minimum, eight characters [1]. Passwords used less than 15 characters as part of multifactor authentication must still meet the requirement of \"a minimum of eight characters in length\" [1]."
+    },
+    {
+      "id": "q03",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "Verifiers SHALL NOT impose composition rules, such as \"requiring mixtures of different character types,\" for passwords [1]. Passwords must instead be either chosen by the subscriber or randomly assigned, with the only restriction being blocklist checks against commonly used, expected, or compromised values [1]. Verifiers also SHALL NOT require periodic password changes (except upon evidence of compromise) [2]."
+    },
+    {
+      "id": "q04",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "No. Verifiers and CSPs SHALL NOT require subscribers to change passwords periodically; however, they SHALL force a change if there is evidence that the authenticator has been compromised [2]."
+    },
+    {
+      "id": "q05",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "The minimum length of a look-up secret is six decimal digits (or equivalent) [1][2]. The guidance states: \"Look-up secrets SHALL be at least six decimal digits (or equivalent) in length\" [1]. Shorter look-up secrets have additional verification requirements, particularly if they are below the minimum security strength of 112 bits [1]."
+    },
+    {
+      "id": "q06",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "Only once \u2014 \"A secret from a look-up secret authenticator SHALL be used successfully only once\" [1]."
+    },
+    {
+      "id": "q07",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "Email is prohibited for out-of-band authentication because it may be vulnerable to: access using only a password, interception in transit or at intermediate mail servers, and rerouting attacks such as those caused by Domain Name System (DNS) spoofing [1]. Confirmation codes sent to validate email addresses or issued as recovery codes are not authentication processes and are not affected by this prohibition [1]."
+    },
+    {
+      "id": "q08",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 3,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "An out-of-band authentication SHALL be considered invalid unless completed within 10 minutes [3]."
+    },
+    {
+      "id": "q09",
+      "hit": true,
+      "rank": 3,
+      "evidence_rank": 4,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "Under the general rate-limiting requirement, the verifier SHALL limit consecutive failed authentication attempts using a specific authenticator on a single subscriber account to no more than 100 by disabling that authenticator [4]. This limit of 100 is an upper bound, and agencies MAY impose lower limits [4]. Disabled authenticators must rebind to the subscriber account before they can be used again [4]."
+    },
+    {
+      "id": "q10",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "At AAL2, the overall reauthentication timeout SHOULD be no more than 24 hours [1]."
+    },
+    {
+      "id": "q11",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "At AAL3, the inactivity timeout SHOULD be no more than 15 minutes [1]."
+    },
+    {
+      "id": "q12",
+      "hit": true,
+      "rank": 2,
+      "evidence_rank": 2,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "Session-binding secrets must be at least 64 bits in length, and shall be established using input from an approved random bit generator [2]."
+    },
+    {
+      "id": "q13",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "Session monitoring is sometimes called \"continuous authentication\" [1]."
+    },
+    {
+      "id": "q14",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "A saved recovery code SHALL include at least **64 bits** from an approved random bit generator [1]."
+    },
+    {
+      "id": "q15",
+      "hit": true,
+      "rank": 3,
+      "evidence_rank": 3,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "According to the guidelines, account recovery \"always causes one or more notifications to be sent to the subscriber to help detect the fraudulent use of account recovery\" [1]. Similarly, Section 4.2.3 states that \"in all cases, account recovery SHALL cause a notification to be sent to the subscriber or their designee\" [3]. These notifications are sent to the notification addresses stored in the subscriber account, with postal addresses receiving notifications only in specific circumstances, such as when no other address is stored or when account recovery occurs at AAL3 [2]."
+    },
+    {
+      "id": "q16",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "A biometric system SHALL operate with an FMR of one in 10000 or better for all demographic groups, achieved under a conformant (zero-effort impostor) attack [1]. Demographic categories considered SHALL include sex and skin tone when these factors affect performance [1]."
+    },
+    {
+      "id": "q17",
+      "hit": true,
+      "rank": 2,
+      "evidence_rank": 2,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "No. Biometric characteristics cannot be used for single-factor authentication\u2014they \"SHALL only be used as part of multi-factor authentication with a physical authenticator (i.e., 'something you have')\" [2]. Biometrics \"do not constitute secrets\" [2], and knowledge-based or biometric methods that lack secrets are not acceptable for authentication under these guidelines [3]."
+    },
+    {
+      "id": "q18",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "When two single-factor authenticators are used at AAL2, the combination SHALL include one physical authenticator (i.e., \"something you have\") \u2014 chosen from a look-up secret, an out-of-band device, or a single-factor OTP \u2014 used in conjunction with either a password or a biometric comparison [1]."
+    },
+    {
+      "id": "q19",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "The Identity Assurance Level (IAL) refers to identity proofing functions [1]. It reflects the robustness of the identity proofing process used to determine the identity of an individual, and is selected to mitigate risks resulting from potential identity proofing failures [3]."
+    },
+    {
+      "id": "q20",
+      "hit": true,
+      "rank": 3,
+      "evidence_rank": 3,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "The Authentication Assurance Level (AAL) refers to authentication functions [3]. More specifically, it describes \"the robustness of the authentication process itself and the binding between an authenticator and a specific individual's identifier,\" and is selected to mitigate risks that result from potential authentication failures [4]. The AAL reflects the level of assurance that the claimant is the same individual to whom the authenticator was registered [5]."
+    },
+    {
+      "id": "q21",
+      "hit": true,
+      "rank": 2,
+      "evidence_rank": 2,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "The Federation Assurance Level (FAL) refers to federation functions when the relying party (RP) is connected to a credential service provider (CSP) or an identity provider (IdP) through a federated protocol [2]. It is defined as a category describing the process used in a federation transaction to communicate authentication events and subscriber attributes to an RP [4]. More broadly, the FAL reflects \"the robustness of the federation process used to communicate authentication and attribute information to an RP from an IdP\" and is selected to mitigate risks from potential federation failures [3]."
+    },
+    {
+      "id": "q22",
+      "hit": true,
+      "rank": 2,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "AAL2 requires proof of the possession and control of two distinct authentication factors, using either a multi-factor authenticator or a combination of two separate single-factor authenticators connected via secure authentication protocols [1][5]. Approved cryptographic techniques are required [2][5]. Applications assessed at AAL2 must also offer a phishing-resistant authentication option [1]. When combining two single-factor authenticators, one shall be a physical authenticator (\"something you have\") paired with either a password or biometric comparison [5]."
+    },
+    {
+      "id": "q23",
+      "hit": true,
+      "rank": 2,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "At AAL3, the authenticator must use a **non-exportable private key** \u2014 a public-key cryptographic authenticator that provides phishing resistance [1][2][3]. The key SHALL be stored in an isolated execution environment protected by hardware or in a separate processor with a controlled interface to the endpoint's CPU [3][5]."
+    },
+    {
+      "id": "q24",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "IAL3 adds the requirement for \"a trained CSP representative (i.e., proofing agent) to interact directly with the applicant, as part of an on-site attended identity proofing session, and the collection of at least one biometric\" [1]. Neither IAL1 nor IAL2 requires this in-person interaction or biometric collection [1]."
+    },
+    {
+      "id": "q25",
+      "hit": true,
+      "rank": 2,
+      "evidence_rank": null,
+      "cited_gold_page": false,
+      "cited_evidence": false,
+      "faithfulness": 1.0,
+      "answer": "A claimant is \"a subject whose identity is to be verified using one or more authentication protocols\" [4], [1]."
+    },
+    {
+      "id": "q26",
+      "hit": true,
+      "rank": 4,
+      "evidence_rank": 4,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "A verifier confirms the claimant's identity by verifying the claimant's possession and control of one or more authenticators using an authentication protocol, and also needs to confirm the binding of the authenticators with the subscriber account and check that the subscriber account is active [2]. Similarly, it is described as confirming the claimant's identity by verifying possession and control of authenticators [4]."
+    },
+    {
+      "id": "q27",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "The Pass Rate (Overall) metric measures the \"Percentage of unique users who successfully complete identity proofing\" [2]. In Table 4, references to unique users include both legitimate users and imposters [1], and it is categorized as a proofing metric [1]."
+    },
+    {
+      "id": "q28",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "RPs and CSPs SHALL enable individuals to convey grievances and seek redress through an issue handling process that is documented, accessible, trackable, and usable by all individuals, with easily findable instructions on a public-facing website [1]. This process must include a governance model, a dedicated function for impartially reviewing evidence and resolving issues, and human support personnel who can override algorithmic adjudication outputs [1]. Organizations must also assess the integrity and performance of their redress mechanisms to prevent identity fraud [1]."
+    },
+    {
+      "id": "q29",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "Organizations must document and communicate all uses of AI/ML to relying organizations, with CSPs, IdPs, or verifiers disclosing integrated AI/ML technologies to all RPs making access decisions based on that information [1]. They must also provide information on training methods and techniques, training data sets, model update frequency, and all testing results [1]. Organizations using or relying on AI/ML should implement the NIST AI Risk Management Framework to evaluate introduced risks [1], and SHALL perform and document privacy risk assessments for personal information processed by such systems [3]."
+    },
+    {
+      "id": "q30",
+      "hit": true,
+      "rank": 2,
+      "evidence_rank": 2,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "A credential service provider (CSP) is a trusted entity whose functions include identity proofing applicants to the identity service and registering authenticators to subscriber accounts; it may be an independent third party [1]. More broadly, CSP functions include proofing applicants, enrolling them into the identity service, establishing subscriber accounts (the CSP's record of the subscriber, attributes, and associated authenticators), and binding authenticators to those accounts [2]. The CSP also issues, stores, and maintains credentials [1]."
+    },
+    {
+      "id": "q31",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "Verifiers and CSPs SHOULD permit a maximum password length of at least 64 characters [1]."
+    },
+    {
+      "id": "q32",
+      "hit": false,
+      "rank": null,
+      "evidence_rank": null,
+      "cited_gold_page": false,
+      "cited_evidence": false,
+      "faithfulness": 1.0,
+      "answer": "Yes, within limits. Verifiers \u201cMAY make limited allowances for mistyping (e.g., removing leading and trailing whitespace characters before verification, allowing the verification of passwords with differing cases for the leading character)\u201d \u2014 but only if the password remains at least the required minimum length after such processing and its complexity is not significantly reduced [1]. No source addresses checking only part of a submitted password beyond such mistyping allowances, so anything beyond that (e.g., verifying only a prefix of the password) is not permitted or addressed in the provided documents."
+    },
+    {
+      "id": "q33",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "The salt SHALL be at least 32 bits in length [1]."
+    },
+    {
+      "id": "q34",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "If the subscriber entered an identifier by which the CSP knows them, the binding code SHALL be at least 40 bits in length; otherwise, a binding code of at least 112 bits is required [1]."
+    },
+    {
+      "id": "q35",
+      "hit": false,
+      "rank": null,
+      "evidence_rank": null,
+      "cited_gold_page": false,
+      "cited_evidence": false,
+      "faithfulness": 1.0,
+      "answer": "Before accepting a passphrase, a service should compare user-chosen passwords \"against a blocklist of unacceptable passwords\" [1]. This list should include passwords from previous breach corpuses, dictionary words used as passwords, and specific words (such as the name of the service itself) that users are likely to choose [1]. This matters because users' password choices are often predictable, and attackers are likely to guess passwords that have previously proven successful, such as dictionary words or breached passwords [1]. Note that the blocklist only needs to include entries that meet the service's minimum length requirement [1]."
+    },
+    {
+      "id": "q36",
+      "hit": true,
+      "rank": 2,
+      "evidence_rank": 2,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "The verifier SHOULD offer an option to display the password rather than dots or asterisks while it is entered and until it is submitted, letting the user confirm their entry when the screen is unlikely to be observed [2]. It may also display individual characters briefly after typing to verify correct entry, which is common on mobile devices [2]. Since masked text entry is error-prone, offering to show text during entry reduces mistakes [1]. Verifiers may also make limited allowances for mistyping, such as removing leading/trailing whitespace, as long as the password remains long enough and complexity isn't significantly reduced [2]."
+    },
+    {
+      "id": "q37",
+      "hit": false,
+      "rank": null,
+      "evidence_rank": null,
+      "cited_gold_page": false,
+      "cited_evidence": false,
+      "faithfulness": 0.0,
+      "answer": "I don't know based on the provided documents.\n\nThe sources describe syncable authenticators \u2014 keys that \"SHALL only be stored in an encrypted form\" in a sync fabric with access protected by \"AAL2-equivalent MFA\" [2] \u2014 but they do not state whether syncable authenticators are permitted or prohibited at the highest assurance level (e.g., AAL3). The documents also list threats related to key transfer between devices, such as insecure cloud services and untrusted devices [1], but do not specify an assurance-level restriction."
+    },
+    {
+      "id": "q38",
+      "hit": false,
+      "rank": null,
+      "evidence_rank": null,
+      "cited_gold_page": false,
+      "cited_evidence": false,
+      "faithfulness": 1.0,
+      "answer": "No. A PIN and a password are both knowledge-based factors (\u201csomething you know\u201d), so requiring both does not constitute two distinct authentication factors. Multifactor authentication requires proof of possession and control of two distinct factors \u2014 for example, at AAL2 the claimant must prove \u201cpossession and control of two distinct authentication factors\u201d [5]. Achieving multifactor authentication would require combining a knowledge factor (like a PIN or password) with a separate factor such as a possession-based authenticator (\u201csomething you have,\u201d activated by \u201csomething you know\u201d or \u201csomething you are\u201d) [1]."
+    },
+    {
+      "id": "q39",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "According to Table 2, AAL3 requires \"Require phishing resistance and verifier compromise protections\" \u2014 so phishing resistance must be required in addition to verifier compromise protections [1]."
+    },
+    {
+      "id": "q40",
+      "hit": true,
+      "rank": 1,
+      "evidence_rank": 1,
+      "cited_gold_page": true,
+      "cited_evidence": true,
+      "faithfulness": 1.0,
+      "answer": "The term is **authentication intent**, defined in [1]. It is \"the process of confirming the claimant\u2019s intent to authenticate or reauthenticate by requiring user intervention in the authentication flow\" [1]. NIST notes that some authenticators (e.g., OTPs) establish intent as part of their operation, while others require a specific step such as pressing a button, and it serves as \"a countermeasure against malware at the endpoint\" [1]."
+    }
+  ]
+}
