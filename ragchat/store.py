@@ -204,3 +204,19 @@ class Store:
             )
 
         return self._run(run)
+
+    def list_documents(self) -> list[dict]:
+        """Summarise stored documents by basename, ignoring directory prefixes."""
+
+        def run(conn: psycopg.Connection):
+            return conn.execute(
+                "SELECT regexp_replace(file, '^.*/', '') AS name,"
+                " max(page) AS pages, count(*) AS chunks"
+                " FROM chunks GROUP BY name ORDER BY name"
+            ).fetchall()
+
+        rows = self._run(run)
+        return [
+            {"file": row[0], "pages": int(row[1]), "chunks": int(row[2])}
+            for row in rows
+        ]

@@ -83,6 +83,55 @@ def test_global_count(store):
     assert store.count() == before + 2
 
 
+@requires_db
+def test_list_documents_reports_pages_and_chunks_per_basename(store):
+    chunks = [
+        Chunk(
+            doc_id="d",
+            file="listdocs-alpha.pdf",
+            page=1,
+            chunk_index=0,
+            text="a",
+            tokens=1,
+        ),
+        Chunk(
+            doc_id="d",
+            file="listdocs-alpha.pdf",
+            page=4,
+            chunk_index=1,
+            text="b",
+            tokens=1,
+        ),
+        Chunk(
+            doc_id="d",
+            file="nested/listdocs-beta.pdf",
+            page=2,
+            chunk_index=0,
+            text="c",
+            tokens=1,
+        ),
+    ]
+    vectors = [
+        [0.0] * 383 + [1.0],
+        [0.0] * 382 + [1.0, 0.0],
+        [1.0] + [0.0] * 383,
+    ]
+    store.replace_doc("d", chunks, vectors)
+
+    documents = {doc["file"]: doc for doc in store.list_documents()}
+
+    assert documents["listdocs-alpha.pdf"] == {
+        "file": "listdocs-alpha.pdf",
+        "pages": 4,
+        "chunks": 2,
+    }
+    assert documents["listdocs-beta.pdf"] == {
+        "file": "listdocs-beta.pdf",
+        "pages": 2,
+        "chunks": 1,
+    }
+
+
 class _FakeCursor:
     def __init__(self, rows):
         self._rows = rows

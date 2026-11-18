@@ -178,6 +178,134 @@ h1 {
   border-radius: 12px;
 }
 
+.how-to {
+  /* Full conversation width so example chips can share a row. */
+  width: 100%;
+  box-sizing: border-box;
+  margin: auto;
+  padding: clamp(16px, 3vw, 24px);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(11, 21, 38, 0.5);
+}
+
+.how-to-title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.document-list {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.document-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.document-title {
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  text-decoration-color: rgba(56, 189, 248, 0.45);
+  text-underline-offset: 3px;
+}
+
+a.document-title:hover,
+a.document-title:focus-visible {
+  color: var(--primary-strong);
+  text-decoration-color: currentColor;
+  outline: none;
+}
+
+.doc-pages {
+  flex: none;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.example-chip {
+  max-width: 100%;
+  padding: 7px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.example-chip:hover:not(:disabled),
+.example-chip:focus-visible:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  outline: none;
+}
+
+.example-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.how-to-hint {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.how-to-fallback {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.how-to-fallback[hidden] {
+  display: none;
+}
+
+.how-to-run {
+  margin: 12px 0 0;
+  font-size: 0.86rem;
+}
+
+.how-to-run a {
+  color: var(--primary-strong);
+  text-decoration: none;
+}
+
+.how-to-run a:hover,
+.how-to-run a:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
 .message {
   max-width: 88%;
   padding: 12px 15px;
@@ -442,6 +570,17 @@ textarea:focus {
 
   .transcript {
     max-height: 46vh;
+  }
+
+  /* Before the first question the guide panel is the whole transcript:
+     show it in full instead of clipping it inside a short scroll box. */
+  .transcript:has(.how-to) {
+    max-height: none;
+  }
+
+  .example-chip {
+    padding: 6px 10px;
+    font-size: 0.8rem;
   }
 
   .message {

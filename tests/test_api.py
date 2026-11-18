@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 
 from fastapi.testclient import TestClient
@@ -9,11 +10,17 @@ from ragchat.store import Hit
 
 
 class FakeStore:
+    def __init__(self, documents=None):
+        self.documents = documents or []
+
     def count(self):
         return 42
 
     def search(self, vector, k=5, query=None, hybrid=False):
         return [Hit(file="a.pdf", page=3, chunk_index=0, text="eight characters", score=0.9)]
+
+    def list_documents(self):
+        return list(self.documents)
 
 
 def _client(monkeypatch, reply="At least 8 characters [1]."):
@@ -44,6 +51,95 @@ def _client(monkeypatch, reply="At least 8 characters [1]."):
 
 def test_health_reports_chunk_count(monkeypatch):
     assert _client(monkeypatch).get("/api/health").json() == {"status": "ok", "chunks": 42}
+
+
+def _documents_client(monkeypatch, documents, manifest_path):
+    store = FakeStore(documents)
+    monkeypatch.setattr(api, "MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr(api, "_store", lambda: store)
+    return TestClient(api.app)
+
+
+def test_documents_are_enriched_from_the_manifest(monkeypatch, tmp_path):
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "documents": [
+                    {
+                        "file": "known.pdf",
+                        "title": "Known title",
+                        "url": "https://example.test/known.pdf",
+                    }
+                ],
+                "examples": [{"label": "Ask", "question": "Question?"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    client = _documents_client(
+        monkeypatch,
+        [
+            {"file": "known.pdf", "pages": 7, "chunks": 12},
+            {"file": "unknown.pdf", "pages": 2, "chunks": 3},
+        ],
+        manifest,
+    )
+
+    body = client.get("/api/documents").json()
+
+    assert body["documents"] == [
+        {
+            "file": "known.pdf",
+            "title": "Known title",
+            "url": "https://example.test/known.pdf",
+            "pages": 7,
+            "chunks": 12,
+        },
+        {
+            "file": "unknown.pdf",
+            "title": "unknown.pdf",
+            "url": None,
+            "pages": 2,
+            "chunks": 3,
+        },
+    ]
+    assert body["examples"] == [{"label": "Ask", "question": "Question?"}]
+
+
+def test_documents_tolerate_a_missing_manifest(monkeypatch, tmp_path):
+    client = _documents_client(
+        monkeypatch,
+        [{"file": "solo.pdf", "pages": 1, "chunks": 1}],
+        tmp_path / "missing.json",
+    )
+
+    body = client.get("/api/documents").json()
+
+    assert body["documents"] == [
+        {"file": "solo.pdf", "title": "solo.pdf", "url": None, "pages": 1, "chunks": 1}
+    ]
+    assert body["examples"] == []
+
+
+def test_documents_response_is_cached_for_the_store(monkeypatch, tmp_path):
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text('{"documents": [], "examples": []}', encoding="utf-8")
+    calls = []
+
+    class CountingStore(FakeStore):
+        def list_documents(self):
+            calls.append(1)
+            return super().list_documents()
+
+    store = CountingStore([{"file": "a.pdf", "pages": 1, "chunks": 1}])
+    monkeypatch.setattr(api, "MANIFEST_PATH", manifest)
+    monkeypatch.setattr(api, "_store", lambda: store)
+    client = TestClient(api.app)
+
+    assert client.get("/api/documents").status_code == 200
+    assert client.get("/api/documents").status_code == 200
+    assert len(calls) == 1
 
 
 def test_chat_returns_answer_and_citations(monkeypatch):
