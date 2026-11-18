@@ -7,9 +7,9 @@ free open model `inclusionai/ling-3.2-flash` via OpenRouter, so answers can take
 seconds and free providers may log prompts. 8 questions per visitor per rolling 60-minute
 window.
 
-[![rag-docs-chatbot demo: cited answer, reasoning, refusal, rate-limit lock, eval](docs/assets/rag-docs-chatbot-demo.gif)](https://willowvibe.github.io/rag-docs-chatbot/#demo)
+[![rag-docs-chatbot demo: cited answer, reasoning, refusal, rate-limit lock, eval](docs/assets/rag-docs-chatbot-demo-v2.gif)](https://willowvibe.github.io/rag-docs-chatbot/#demo)
 
-Full 85-second walkthrough with narration: https://willowvibe.github.io/rag-docs-chatbot/
+Full 87-second walkthrough with narration: https://willowvibe.github.io/rag-docs-chatbot/
 
 This repository is a document-QA app over a small, public-domain corpus. Answers are
 generated from retrieved passages and carry citations back to the source document, and

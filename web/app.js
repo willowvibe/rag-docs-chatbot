@@ -646,12 +646,20 @@
     });
   }
 
+  function clearActiveSource() {
+    var active = sources.querySelectorAll(".source-card.is-active");
+    for (var i = 0; i < active.length; i += 1) {
+      active[i].classList.remove("is-active");
+    }
+  }
+
   function revealSource(marker) {
     var card = sources.querySelector('[data-marker="' + marker + '"]');
     if (!card) {
       return;
     }
 
+    clearActiveSource();
     card.scrollIntoView({
       behavior: prefersReducedMotion() ? "auto" : "smooth",
       block: "center"
@@ -661,10 +669,6 @@
     card.classList.add("is-active");
     card.setAttribute("tabindex", "-1");
     card.focus({ preventScroll: true });
-
-    window.setTimeout(function () {
-      card.classList.remove("is-active");
-    }, 1600);
   }
 
   function citationFor(button) {
@@ -717,6 +721,7 @@
   }
 
   function ask(question) {
+    clearActiveSource();
     addMessage("user", question);
     input.value = "";
     setBusy(true);

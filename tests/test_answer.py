@@ -1,7 +1,7 @@
 # tests/test_answer.py
 import pytest
 
-from ragchat.answer import answer, build_messages, parse_citations
+from ragchat.answer import SYSTEM_PROMPT, answer, build_messages, parse_citations
 from ragchat.store import Hit
 
 HITS = [
@@ -35,6 +35,11 @@ class FlakyClient:
             raise self.failures.pop(0)
         block = type("Block", (), {"type": "text", "text": self.reply})()
         return type("Msg", (), {"content": [block]})()
+
+
+def test_system_prompt_forbids_appending_the_refusal_to_an_answer():
+    assert "nothing else" in SYSTEM_PROMPT
+    assert "Never add that sentence to an answer that uses the sources." in SYSTEM_PROMPT
 
 
 def test_build_messages_numbers_sources_and_names_file_and_page():
@@ -170,6 +175,31 @@ def test_answer_treats_missing_markers_as_uncited():
     result = answer("Unrelated?", HITS, client=client)
     assert result.citations == []
     assert result.text == "I don't know based on the provided documents."
+
+
+def test_answer_drops_a_trailing_refusal_from_a_cited_answer():
+    client = FakeClient(
+        "Passwords must be at least 8 characters [1].\n\n"
+        "I don't know based on the provided documents."
+    )
+    result = answer("How long?", HITS, client=client)
+    assert result.text == "Passwords must be at least 8 characters [1]."
+    assert [(c.file, c.page) for c in result.citations] == [("a.pdf", 4)]
+
+
+def test_answer_leaves_a_refusal_only_answer_unchanged():
+    client = FakeClient("I don't know based on the provided documents.")
+    result = answer("Unrelated?", HITS, client=client)
+    assert result.text == "I don't know based on the provided documents."
+    assert result.citations == []
+
+
+def test_answer_leaves_uncited_text_containing_the_refusal_unchanged():
+    text = "I don't know based on the provided documents. Please ask someone else."
+    client = FakeClient(text)
+    result = answer("Unrelated?", HITS, client=client)
+    assert result.text == text
+    assert result.citations == []
 
 
 def test_answer_with_no_hits_does_not_call_the_model():

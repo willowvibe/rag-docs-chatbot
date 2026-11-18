@@ -16,13 +16,16 @@ SYSTEM_PROMPT = """You answer questions using ONLY the numbered sources provided
 Rules:
 - Cite every factual claim with the source number in square brackets, like [2].
 - Use the source's file name and page exactly as given; never invent a page.
-- If the sources do not contain the answer, reply exactly:
-  I don't know based on the provided documents.
+- If the sources do not contain the answer, reply with exactly this sentence and nothing else: I don't know based on the provided documents. Never add that sentence to an answer that uses the sources.
 - Do not use outside knowledge, even if you are confident.
 - Answer in at most 6 sentences. Quote sparingly, at most one short phrase per source.
 """
 
 REFUSAL = "I don't know based on the provided documents."
+_REFUSAL_SENTENCE = re.compile(
+    rf"\s*{re.escape(REFUSAL.rstrip('.'))}\.?\s*",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -107,6 +110,17 @@ def parse_citations(text: str, hits: list[Hit]) -> list[Citation]:
     return citations
 
 
+def _strip_trailing_refusal(text: str, citations: list[Citation]) -> str:
+    """Drop a stray refusal sentence from an answer that actually cites sources."""
+    if text.strip() == REFUSAL or not citations:
+        return text
+    cleaned = _REFUSAL_SENTENCE.sub(" ", text)
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    return cleaned.strip()
+
+
 def answer(
     question: str,
     hits: list[Hit],
@@ -151,9 +165,11 @@ def answer(
         text = "".join(block.text for block in response.content if block.type == "text").strip()
         text = normalize_citation_markers(text)
         text = resolve_source_only_markers(text, hits)
+        citations = parse_citations(text, hits)
+        text = _strip_trailing_refusal(text, citations)
         return Answer(
             text=text,
-            citations=parse_citations(text, hits),
+            citations=citations,
             used_hits=hits,
             model=attempt_model,
         )
