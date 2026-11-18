@@ -21,6 +21,12 @@ def test_discovery_accepts_a_single_file(tmp_path):
     assert discover_documents(doc) == [doc]
 
 
+def test_discovery_ignores_manifest_json(tmp_path):
+    (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "a.pdf").write_text("x", encoding="utf-8")
+    assert [p.name for p in discover_documents(tmp_path)] == ["a.pdf"]
+
+
 def test_bundled_corpus_discovers_exactly_the_two_documents():
     corpus = Path(__file__).resolve().parent.parent / "corpus"
     assert [p.name for p in discover_documents(corpus)] == [

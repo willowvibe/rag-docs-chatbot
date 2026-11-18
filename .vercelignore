@@ -6,7 +6,8 @@
 /.superpowers
 /tests
 /eval
-/corpus
+/corpus/*
+!/corpus/manifest.json
 /docs
 /.github
 

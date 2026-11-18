@@ -1,0 +1,32 @@
+{
+  "documents": [
+    {
+      "file": "nist-sp-800-63-4.pdf",
+      "title": "NIST SP 800-63-4 · Digital Identity Guidelines",
+      "url": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-63-4.pdf"
+    },
+    {
+      "file": "nist-sp-800-63b.pdf",
+      "title": "NIST SP 800-63B-4 · Authentication and Authenticator Management",
+      "url": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-63b-4.pdf"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Do passwords need periodic changes?",
+      "question": "Do verifiers require subscribers to change passwords periodically?"
+    },
+    {
+      "label": "Can sites force special characters?",
+      "question": "What composition rules may verifiers impose on passwords?"
+    },
+    {
+      "label": "Why can't email deliver login codes?",
+      "question": "Why is email prohibited for out-of-band authentication?"
+    },
+    {
+      "label": "What must organizations disclose about AI?",
+      "question": "What must organizations do about all uses of AI/ML in the identity system?"
+    }
+  ]
+}

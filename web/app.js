@@ -9,7 +9,11 @@
   var quota = document.getElementById("quota");
   var transcript = document.getElementById("transcript");
   var sources = document.getElementById("sources");
-  var emptyState = document.getElementById("empty-state");
+  var howTo = document.getElementById("how-to");
+  var documentList = document.getElementById("document-list");
+  var exampleChips = document.getElementById("example-chips");
+  var howToFallback = document.getElementById("how-to-fallback");
+  var exampleButtons = [];
   var busy = false;
   var locked = false;
   var lockTimer = null;
@@ -26,6 +30,120 @@
 
   function scrollToLatest() {
     transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function updateExampleButtons() {
+    exampleButtons.forEach(function (button) {
+      button.disabled = busy || locked;
+    });
+  }
+
+  function askExample(question) {
+    if (busy || locked || typeof question !== "string" || !question.trim()) {
+      return;
+    }
+    input.value = question;
+    if (typeof form.requestSubmit === "function") {
+      form.requestSubmit();
+    } else {
+      submitQuestion();
+    }
+  }
+
+  function renderHowTo(payload) {
+    if (!documentList || !exampleChips) {
+      return;
+    }
+    documentList.textContent = "";
+    exampleChips.textContent = "";
+    exampleButtons = [];
+
+    var documents = payload && Array.isArray(payload.documents) ? payload.documents : [];
+    documents.forEach(function (doc) {
+      var file = doc && typeof doc.file === "string" ? doc.file : "";
+      var title =
+        doc && typeof doc.title === "string" && doc.title ? doc.title : file;
+      if (!title) {
+        title = "Unknown document";
+      }
+
+      var item = document.createElement("li");
+      if (doc && typeof doc.url === "string" && doc.url) {
+        var link = document.createElement("a");
+        link.className = "document-title";
+        link.href = doc.url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = title;
+        item.appendChild(link);
+      } else {
+        var name = document.createElement("span");
+        name.className = "document-title";
+        name.textContent = title;
+        item.appendChild(name);
+      }
+
+      var pages = document.createElement("span");
+      pages.className = "doc-pages";
+      var pageCount = doc && typeof doc.pages === "number" ? doc.pages : 0;
+      pages.textContent =
+        pageCount + (pageCount === 1 ? " page" : " pages");
+      item.appendChild(pages);
+      documentList.appendChild(item);
+    });
+
+    var examples = payload && Array.isArray(payload.examples) ? payload.examples : [];
+    examples.forEach(function (example) {
+      if (
+        !example ||
+        typeof example.label !== "string" ||
+        typeof example.question !== "string"
+      ) {
+        return;
+      }
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "example-chip";
+      button.textContent = example.label;
+      button.disabled = busy || locked;
+      button.addEventListener("click", function () {
+        askExample(example.question);
+      });
+      exampleButtons.push(button);
+      exampleChips.appendChild(button);
+    });
+
+    if (howToFallback) {
+      howToFallback.hidden = true;
+    }
+  }
+
+  function showHowToFallback() {
+    if (documentList) {
+      documentList.textContent = "";
+    }
+    if (exampleChips) {
+      exampleChips.textContent = "";
+    }
+    exampleButtons = [];
+    if (howToFallback) {
+      howToFallback.hidden = false;
+    }
+  }
+
+  function loadHowTo() {
+    if (!howTo) {
+      return;
+    }
+    fetch("/api/documents", { headers: { Accept: "application/json" } })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("documents unavailable");
+        }
+        return response.json();
+      })
+      .then(renderHowTo)
+      .catch(showHowToFallback);
   }
 
   function prefersReducedMotion() {
@@ -109,6 +227,7 @@
     input.disabled = false;
     send.disabled = false;
     send.textContent = busy ? "Thinking…" : "Ask";
+    updateExampleButtons();
     setQuotaText("Your questions are available again", null);
   }
 
@@ -136,6 +255,7 @@
     lockDeadline = Date.now() + safeSeconds * 1000;
     input.disabled = true;
     send.disabled = true;
+    updateExampleButtons();
     updateLockedCountdown();
     if (locked) {
       lockTimer = window.setInterval(updateLockedCountdown, 30000);
@@ -151,6 +271,7 @@
     lockDeadline = 0;
     input.disabled = true;
     send.disabled = true;
+    updateExampleButtons();
     setQuotaText(
       "The demo's daily limit has been reached. Try again tomorrow.",
       "quota--locked"
@@ -210,8 +331,8 @@
   }
 
   function addMessage(role, text) {
-    if (emptyState && emptyState.parentNode === transcript) {
-      emptyState.remove();
+    if (howTo && howTo.parentNode === transcript) {
+      howTo.remove();
     }
     var node = document.createElement("div");
     node.className = "message " + role;
@@ -226,6 +347,7 @@
     send.disabled = value || locked;
     input.disabled = locked;
     send.textContent = value ? "Thinking…" : "Ask";
+    updateExampleButtons();
   }
 
   function renderAnswer(text, citations) {
@@ -457,4 +579,6 @@
     renderSources(citations);
     revealSource(marker);
   });
+
+  loadHowTo();
 })();

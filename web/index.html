@@ -21,7 +21,15 @@
       <h2 id="chat-heading" class="pane-title">Conversation</h2>
 
       <div id="transcript" class="transcript" role="log" aria-live="polite" aria-relevant="additions">
-        <p class="empty-state" id="empty-state">Ask about password length, rate limiting, or authenticator requirements.</p>
+        <section class="how-to" id="how-to" aria-labelledby="how-to-heading">
+          <h3 id="how-to-heading" class="how-to-title">Ask questions about these documents</h3>
+          <ul id="document-list" class="document-list"></ul>
+          <p id="how-to-fallback" class="how-to-fallback" hidden>Ask a question about the documents in this demo.</p>
+          <div id="example-chips" class="example-chips"></div>
+          <p class="how-to-hint">Answers cite sources like <span class="marker-sample">[1]</span> — click one to see the page.</p>
+          <p class="how-to-hint">It says "I don't know" when the documents don't cover a question.</p>
+          <p class="how-to-run"><a href="https://github.com/willowvibe/rag-docs-chatbot#quick-start" target="_blank" rel="noopener">Want your own documents? Run it locally →</a></p>
+        </section>
       </div>
 
       <form id="ask-form" class="composer" novalidate>

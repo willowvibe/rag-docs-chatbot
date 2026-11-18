@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from ragchat.rerank import Reranker
 from ragchat.store import Store
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+MANIFEST_PATH = Path(__file__).resolve().parent.parent / "corpus" / "manifest.json"
 
 app = FastAPI(title="rag-docs-chatbot", docs_url="/api/docs", openapi_url="/api/openapi.json")
 
@@ -27,6 +29,7 @@ app = FastAPI(title="rag-docs-chatbot", docs_url="/api/docs", openapi_url="/api/
 _STORE: Store | None = None
 _EMBEDDER: Embedder | None = None
 _RERANKER: Reranker | None = None
+_DOCUMENTS_CACHE: tuple[Store, dict] | None = None
 
 
 def _settings():
@@ -64,6 +67,54 @@ def _answer(question: str, hits, model: str, fallback_model: str | None = None):
     )
 
 
+def _load_manifest() -> dict:
+    try:
+        data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"documents": [], "examples": []}
+    if not isinstance(data, dict):
+        return {"documents": [], "examples": []}
+    documents = data.get("documents")
+    examples = data.get("examples")
+    return {
+        "documents": documents if isinstance(documents, list) else [],
+        "examples": examples if isinstance(examples, list) else [],
+    }
+
+
+def _build_documents(store: Store) -> dict:
+    manifest = _load_manifest()
+    metadata = {
+        item["file"]: item
+        for item in manifest["documents"]
+        if isinstance(item, dict) and isinstance(item.get("file"), str)
+    }
+    documents = []
+    for row in store.list_documents():
+        name = row["file"]
+        meta = metadata.get(name)
+        title = meta.get("title") if meta else None
+        url = meta.get("url") if meta else None
+        documents.append(
+            {
+                "file": name,
+                "title": title if isinstance(title, str) else name,
+                "url": url if isinstance(url, str) else None,
+                "pages": row["pages"],
+                "chunks": row["chunks"],
+            }
+        )
+    return {"documents": documents, "examples": manifest["examples"]}
+
+
+def _documents_payload() -> dict:
+    global _DOCUMENTS_CACHE
+    store = _store()
+    if _DOCUMENTS_CACHE is None or _DOCUMENTS_CACHE[0] is not store:
+        _DOCUMENTS_CACHE = (store, _build_documents(store))
+    return _DOCUMENTS_CACHE[1]
+
+
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1)
     k: int | None = Field(default=None, ge=1, le=10)
@@ -80,6 +131,11 @@ def _seconds_until_utc_midnight() -> int:
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok", "chunks": _store().count()}
+
+
+@app.get("/api/documents")
+def documents() -> dict:
+    return _documents_payload()
 
 
 @app.post("/api/chat")
