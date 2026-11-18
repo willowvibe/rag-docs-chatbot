@@ -2,6 +2,8 @@
 
 Ask your documents, get cited answers — plus an eval score you can reproduce.
 
+**Live demo:** https://rag-docs-chatbot-three.vercel.app — 8 questions per visitor per hour.
+
 This repository is a document-QA app over a small, public-domain corpus. Answers are
 generated from retrieved passages and carry citations back to the source document, and
 the retrieval pipeline ships with an eval harness so the numbers can be regenerated from
@@ -13,8 +15,32 @@ embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud (co
 model, default `glm-5.3-flash`) grounded in retrieved passages with `[n]` citations and an
 explicit refusal; a rate-limited FastAPI service and
 web UI; a 40-question eval harness; a Docker quickstart; and CI. If the primary model call
-fails, the API retries once on the fallback model (`RAG_FALLBACK_MODEL`). The published eval
-report, a demo video and a live demo are coming.
+fails, the API retries once on the fallback model (`RAG_FALLBACK_MODEL`). A demo video is
+coming.
+
+## Results
+
+The numbers below come from one recorded run of `make eval` ([eval/report.md](eval/report.md))
+on the 40-question golden set with the live demo's configuration (vector retrieval, no
+reranker, `glm-5.3-flash`, k = 5):
+
+| Metric | Value |
+|---|---|
+| Evidence hit@5 | 87.5% |
+| Evidence MRR | 0.713 |
+| Citation contains the evidence | 87.5% |
+| Faithfulness (LLM judge) | 0.97 |
+
+With hybrid search plus the MiniLM reranker (on in Docker Compose), evidence hit@5 rises to
+92.5% and MRR to 0.805 (measured separately, see the hybrid/rerank paragraph below).
+
+**Caveats:**
+
+- Faithfulness is judged by the same model that answers, so it is self-assessed.
+- The judge scored one correct refusal ("I don't know based on the provided documents",
+  q37) as 0.0 — that single question is the whole gap below 1.0.
+- Five questions (q25, q32, q35, q37, q38) miss retrieval entirely, mostly
+  everyday-wording paraphrases — the main known weakness.
 
 ## Quick start
 
@@ -98,9 +124,13 @@ Set these in the Vercel project settings:
 - `OLLAMA_API_KEY` (or `LLM_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY`)
 - `DATABASE_URL`
 - `RATE_LIMIT_ENABLED=1` (demo only; the shipped default is `0`)
-- `PER_IP_PER_HOUR=20`
+- `PER_IP_PER_HOUR=8`
 - `DAILY_CAP=500`
 - `FASTEMBED_CACHE_PATH=/tmp/fastembed`
+
+The live demo uses 8 questions per visitor per hour and a daily cap of 500, and the page
+shows visitors how many questions they have left, warns at 2 left, and disables the input
+with a countdown at 0.
 
 The API key and database URL carry deployment-specific credentials; keep them in the
 project settings and out of the repository. `FASTEMBED_CACHE_PATH` is set explicitly because the function
@@ -127,20 +157,20 @@ To confirm the limits actually bite, run this against a deployment with
 `RATE_LIMIT_ENABLED=1`. Run it **once, on a fresh hour, from a single machine**: the
 per-IP counter is per hour, so a second run in the same hour begins with `429`s. Vercel
 overwrites a client-supplied `X-Forwarded-For` and sets `x-real-ip` to the same value, so
-the `x-forwarded-for` header below is inert on Vercel; the loop works because all 21
+the `x-forwarded-for` header below is inert on Vercel; the loop works because all 9
 requests share one public IP. The header is kept because a non-Vercel proxy would honour
 it.
 
 ```bash
 URL=https://<deployment>.vercel.app
-for i in $(seq 1 21); do
+for i in $(seq 1 9); do
   curl -s -o /dev/null -w "%{http_code}\n" -X POST "$URL/api/chat" \
     -H 'content-type: application/json' -H 'x-forwarded-for: 203.0.113.7' \
     -d '{"question":"What is the minimum password length?"}'
 done | sort | uniq -c
 ```
 
-Twenty requests should print `200` and the twenty-first `429`. Check that the UI shows
+Eight requests should print `200` and the ninth `429`. Check that the UI shows
 the 429 message and still renders, and that the key is absent from every client-side file.
 This prints `0` for each of `/`, `/static/app.js` and `/static/styles.css`:
 
