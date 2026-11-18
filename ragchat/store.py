@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
+from typing import Callable, TypeVar
 
 import psycopg
 from pgvector.psycopg import register_vector
 from pgvector.utils import Vector
 
 from ragchat.ingest.chunker import Chunk
+
+_T = TypeVar("_T")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS chunks (
@@ -80,11 +84,40 @@ class Hit:
 class Store:
     def __init__(self, database_url: str) -> None:
         self._url = database_url
+        self._conn: psycopg.Connection | None = None
+        # FastAPI runs sync handlers in a thread pool and Vercel Fluid compute serves
+        # concurrent requests per instance; serialise use of the shared connection so
+        # one request's statements never run inside another's transaction.
+        self._lock = threading.Lock()
 
     def _connect(self) -> psycopg.Connection:
         conn = psycopg.connect(self._url, autocommit=True)
         register_vector(conn)
         return conn
+
+    def _connection(self) -> psycopg.Connection:
+        if self._conn is None or self._conn.closed:
+            self._conn = self._connect()
+        return self._conn
+
+    def _discard_connection(self) -> None:
+        conn, self._conn = self._conn, None
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def _run(self, operation: Callable[[psycopg.Connection], _T]) -> _T:
+        with self._lock:
+            for attempt in range(2):
+                try:
+                    return operation(self._connection())
+                except (psycopg.OperationalError, psycopg.InterfaceError):
+                    self._discard_connection()
+                    if attempt == 1:
+                        raise
+        raise AssertionError("unreachable")
 
     def ensure_schema(self) -> None:
         # On a fresh database the vector type does not exist yet, so the
@@ -120,10 +153,10 @@ class Store:
         query: str | None = None,
         hybrid: bool = False,
     ) -> list[Hit]:
-        with self._connect() as conn:
+        def run(conn: psycopg.Connection):
             if hybrid and query:
                 depth = max(2 * k, 40)
-                rows = conn.execute(
+                return conn.execute(
                     _HYBRID_SEARCH,
                     (
                         Vector(vector),
@@ -134,19 +167,20 @@ class Store:
                         k,
                     ),
                 ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT file, page, chunk_index, text, 1 - (embedding <=> %s) AS score"
-                    " FROM chunks ORDER BY embedding <=> %s LIMIT %s",
-                    (Vector(vector), Vector(vector), k),
-                ).fetchall()
+            return conn.execute(
+                "SELECT file, page, chunk_index, text, 1 - (embedding <=> %s) AS score"
+                " FROM chunks ORDER BY embedding <=> %s LIMIT %s",
+                (Vector(vector), Vector(vector), k),
+            ).fetchall()
+
+        rows = self._run(run)
         return [
             Hit(file=r[0], page=r[1], chunk_index=r[2], text=r[3], score=float(r[4]))
             for r in rows
         ]
 
     def count(self, doc_id: str | None = None) -> int:
-        with self._connect() as conn:
+        def run(conn: psycopg.Connection) -> int:
             if doc_id is None:
                 return int(conn.execute("SELECT count(*) FROM chunks").fetchone()[0])
             return int(
@@ -155,9 +189,12 @@ class Store:
                 ).fetchone()[0]
             )
 
+        return self._run(run)
+
     def count_for_file(self, name: str) -> int:
         """Count chunks whose stored path has this basename (files may live in subdirs)."""
-        with self._connect() as conn:
+
+        def run(conn: psycopg.Connection) -> int:
             return int(
                 conn.execute(
                     "SELECT count(*) FROM chunks"
@@ -165,3 +202,5 @@ class Store:
                     (name,),
                 ).fetchone()[0]
             )
+
+        return self._run(run)

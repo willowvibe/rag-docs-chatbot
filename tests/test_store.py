@@ -1,7 +1,9 @@
 import os
 
+import psycopg
 import pytest
 
+import ragchat.store as store_module
 from ragchat.embeddings import Embedder
 from ragchat.ingest.chunker import Chunk
 from ragchat.store import Store
@@ -79,6 +81,90 @@ def test_global_count(store):
     vectors = [[0.0] * 383 + [1.0], [0.0] * 382 + [1.0, 0.0]]
     store.replace_doc("d", chunks, vectors)
     assert store.count() == before + 2
+
+
+class _FakeCursor:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def fetchall(self):
+        return self._rows
+
+    def fetchone(self):
+        return self._rows[0]
+
+
+class _FakeConnection:
+    def __init__(self, rows, fail_first=False):
+        self.closed = False
+        self.rows = rows
+        self.fail_first = fail_first
+        self.executed = 0
+
+    def execute(self, sql, params=None):
+        self.executed += 1
+        if self.fail_first:
+            self.fail_first = False
+            raise psycopg.OperationalError("connection dropped")
+        return _FakeCursor(self.rows)
+
+    def close(self):
+        self.closed = True
+
+
+class _FakeConnect:
+    def __init__(self, rows, fail_first=False):
+        self.rows = rows
+        self.fail_first = fail_first
+        self.connections = []
+
+    def __call__(self, *args, **kwargs):
+        conn = _FakeConnection(self.rows, fail_first=self.fail_first and not self.connections)
+        self.connections.append(conn)
+        return conn
+
+
+def _use_fake_connect(monkeypatch, fake):
+    monkeypatch.setattr(store_module.psycopg, "connect", fake)
+    monkeypatch.setattr(store_module, "register_vector", lambda conn: None)
+
+
+def test_search_reuses_one_connection(monkeypatch):
+    fake = _FakeConnect([("f.pdf", 1, 0, "text", 0.9)])
+    _use_fake_connect(monkeypatch, fake)
+    store = Store("postgresql://example")
+
+    vector = [0.0] * 384
+    first = store.search(vector)
+    second = store.search(vector)
+
+    assert first == second
+    assert len(fake.connections) == 1
+    assert fake.connections[0].executed == 2
+
+
+def test_search_reconnects_after_dropped_connection(monkeypatch):
+    fake = _FakeConnect([("f.pdf", 1, 0, "text", 0.9)], fail_first=True)
+    _use_fake_connect(monkeypatch, fake)
+    store = Store("postgresql://example")
+
+    hits = store.search([0.0] * 384)
+
+    assert hits[0].text == "text"
+    assert len(fake.connections) == 2
+    assert fake.connections[0].closed
+    assert not fake.connections[1].closed
+
+
+def test_count_reuses_the_search_connection(monkeypatch):
+    fake = _FakeConnect([(2,)])
+    _use_fake_connect(monkeypatch, fake)
+    store = Store("postgresql://example")
+
+    assert store.count() == 2
+    assert store.count() == 2
+
+    assert len(fake.connections) == 1
 
 
 def test_embedder_is_normalised_and_deterministic():
