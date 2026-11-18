@@ -104,7 +104,9 @@ def run_eval(golden_path: Path, store: Store, embedder: Embedder, client,
             0.0 if evidence_rank is None else 1.0 / evidence_rank
         )
 
-        result = answer_fn(item["question"], hits, client=client, model=model)
+        result = answer_fn(
+            item["question"], hits, client=client, model=model, fallbacks=[]
+        )
         page_ok = any(c.page == item["page"] and Path(c.file).name == gold_name
                       for c in result.citations)
         grounded += int(page_ok)

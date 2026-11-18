@@ -19,7 +19,8 @@ embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud (co
 model, default `glm-5.3-flash`) grounded in retrieved passages with `[n]` citations and an
 explicit refusal; a rate-limited FastAPI service and
 web UI; a 40-question eval harness; a Docker quickstart; and CI. If the primary model call
-fails, the API retries once on the fallback model (`RAG_FALLBACK_MODEL`).
+fails, the API walks an ordered fallback chain that can span Ollama Cloud and OpenRouter
+(`RAG_FALLBACK_MODELS`).
 
 ## Results
 
@@ -48,8 +49,9 @@ With hybrid search plus the MiniLM reranker (on in Docker Compose), evidence hit
 ## Quick start
 
 Requires Docker and Python 3.12. Answering needs an `OLLAMA_API_KEY` (Ollama Cloud), or an `ANTHROPIC_API_KEY` with
-`LLM_PROVIDER=anthropic`; ingestion,
-retrieval and the tests work without one.
+`LLM_PROVIDER=anthropic`; an optional `OPENROUTER_API_KEY` enables the free OpenRouter
+fallbacks. Ingestion,
+retrieval and the tests work without a key.
 
 ```bash
 python3 -m venv .venv
@@ -83,9 +85,11 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 | `OLLAMA_API_KEY` | empty |
 | `OLLAMA_HOST` | `https://ollama.com` |
 | `ANTHROPIC_API_KEY` | empty (only with `LLM_PROVIDER=anthropic`) |
+| `OPENROUTER_API_KEY` | empty (enables OpenRouter fallbacks) |
 | `RAG_MODEL` | `glm-5.3-flash` (anthropic: `claude-sonnet-5-5`) |
 | `RAG_CHEAP_MODEL` | `glm-5.3-flash` (anthropic: `claude-haiku-5-5`) |
-| `RAG_FALLBACK_MODEL` | `deepseek-v4.1-flash:1017` (anthropic: none) |
+| `RAG_FALLBACK_MODELS` | `ollama:deepseek-v4.1-flash:1017,openrouter:inclusionai/ling-3.2-flash:free,openrouter:nvidia/nemotron-3.5-super-vl:free` (anthropic: none) |
+| `RAG_FALLBACK_MODEL` | **legacy**: a single model for the active provider; use `RAG_FALLBACK_MODELS` instead |
 | `RAG_THINK` | `0` (off; Ollama thinking mode is off because reasoning tokens count against the answer budget and caused empty answers) |
 | `RAG_TOP_K` | `5` |
 | `RAG_RERANK` | `0` (off; Docker Compose sets `1`) |
@@ -99,6 +103,21 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 
 Docker Compose turns both `RAG_HYBRID` and `RAG_RERANK` on, while the code default is off so serverless/Vercel deploys are unaffected.
 
+### Fallback chain
+
+`RAG_FALLBACK_MODELS` is a comma-separated list of `provider:model` entries, tried in order
+after the primary model. Each entry splits on the first colon only, so model ids that
+contain colons work (`ollama:deepseek-v4.1-flash:1017`). `none`/`off` disables fallbacks,
+and entries whose provider key is missing are dropped so a missing key never causes a
+doomed call. OpenRouter calls disable reasoning; free reasoning models otherwise spend the
+whole token budget thinking and return empty content.
+
+On the 40-question grounding eval, `glm-5.3-flash` scored 87.5%,
+`inclusionai/ling-3.2-flash:free` 87.5%, and `nvidia/nemotron-3.5-super-vl:free` 85.0%,
+all with 0 errors. Free OpenRouter models can be rate-limited (an HTTP 429 counts as a
+failed attempt and moves to the next model), and many free providers log prompts, so
+visitors' questions may be retained by those providers when a fallback is used.
+
 Hybrid search fuses vector and keyword results with reciprocal rank fusion (k=60). On the 40-question golden set, hybrid + MiniLM reranking of 15 candidates raised evidence hit@5 0.875 -> 0.925 and MRR@5 0.713 -> 0.805 versus vector-only, adding about 1.25 s per question on a 16-thread CPU (reranking costs ~78 ms per candidate; search itself ~60 ms).
 
 ## Deploy
@@ -107,7 +126,7 @@ The app runs in two lanes. **Self-host** means running it locally or in Docker w
 own `OLLAMA_API_KEY` (or Anthropic key). **Hosted demo** means running it on Vercel, where the owner's key
 lives in the project's environment variables — never in the browser — and per-IP and
 per-day limits backstop it. `RATE_LIMIT_ENABLED` ships as `0`; only the demo deployment
-sets it to `1`.
+sets it to `1`. An `OPENROUTER_API_KEY` is optional and enables the free fallback models.
 
 Prerequisites:
 

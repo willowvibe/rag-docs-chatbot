@@ -80,6 +80,7 @@ def test_answer_returns_text_and_citations():
     assert result.text.endswith("[1].")
     assert result.citations[0].file == "a.pdf"
     assert len(result.used_hits) == 2
+    assert result.model == "claude-sonnet-5-5"
     assert client.calls[0]["model"] == "claude-sonnet-5-5"
     assert client.calls[0]["max_tokens"] == 700
 
@@ -178,66 +179,78 @@ def test_answer_with_no_hits_does_not_call_the_model():
     assert result.text == "I don't know based on the provided documents."
 
 
-def test_answer_retries_with_the_fallback_model_when_the_primary_fails(caplog):
-    client = FlakyClient([RuntimeError("primary boom")], "Fallback answer [2].")
+def test_answer_falls_through_to_a_later_fallback_and_reports_its_model(caplog):
+    primary = FlakyClient([RuntimeError("primary boom")], "unused")
+    fallback_one = FlakyClient([RuntimeError("fallback one boom")], "unused")
+    fallback_two = FakeClient("Fallback answer [2].")
+
     result = answer(
         "Rate limiting?",
         HITS,
-        client=client,
+        client=primary,
         model="primary-model",
-        fallback_model="backup-model",
+        fallbacks=[
+            (fallback_one, "fallback-one-model"),
+            (fallback_two, "fallback-two-model"),
+        ],
     )
 
     assert result.text == "Fallback answer [2]."
     assert [(c.file, c.page) for c in result.citations] == [("b.pdf", 11)]
-    assert [call["model"] for call in client.calls] == ["primary-model", "backup-model"]
+    assert result.model == "fallback-two-model"
+    assert [call["model"] for call in primary.calls] == ["primary-model"]
+    assert [call["model"] for call in fallback_one.calls] == ["fallback-one-model"]
+    assert [call["model"] for call in fallback_two.calls] == ["fallback-two-model"]
     assert "primary-model" in caplog.text
-    assert "backup-model" in caplog.text
+    assert "fallback-one-model" in caplog.text
     assert "RuntimeError" in caplog.text
 
 
-def test_answer_retries_with_the_fallback_model_when_the_completion_is_empty(caplog):
-    client = FlakyClient(
-        [
-            RuntimeError(
-                "empty completion from primary-model (done_reason=length)"
-            )
-        ],
-        "Fallback answer [2].",
+def test_answer_retries_when_the_completion_is_empty(caplog):
+    primary = FlakyClient(
+        [RuntimeError("empty completion from primary-model (done_reason=length)")],
+        "unused",
     )
+    fallback = FakeClient("Fallback answer [2].")
+
     result = answer(
         "Rate limiting?",
         HITS,
-        client=client,
+        client=primary,
         model="primary-model",
-        fallback_model="backup-model",
+        fallbacks=[(fallback, "backup-model")],
     )
 
     assert result.text == "Fallback answer [2]."
-    assert [call["model"] for call in client.calls] == ["primary-model", "backup-model"]
+    assert result.model == "backup-model"
     # The warning names the exception type only, never its message (no secret leakage).
     assert "RuntimeError" in caplog.text
-    assert "backup-model" in caplog.text
+    assert "primary-model" in caplog.text
 
 
-def test_answer_raises_when_the_primary_and_fallback_both_fail():
-    client = FlakyClient(
-        [RuntimeError("primary boom"), RuntimeError("fallback boom")],
-        "unused",
-    )
-    with pytest.raises(RuntimeError, match="fallback boom"):
+def test_answer_raises_the_last_error_when_every_fallback_fails():
+    primary = FlakyClient([RuntimeError("primary boom")], "unused")
+    fallback_one = FlakyClient([RuntimeError("fallback one boom")], "unused")
+    fallback_two = FlakyClient([RuntimeError("fallback two boom")], "unused")
+
+    with pytest.raises(RuntimeError, match="fallback two boom"):
         answer(
             "Rate limiting?",
             HITS,
-            client=client,
+            client=primary,
             model="primary-model",
-            fallback_model="backup-model",
+            fallbacks=[
+                (fallback_one, "fallback-one-model"),
+                (fallback_two, "fallback-two-model"),
+            ],
         )
 
-    assert [call["model"] for call in client.calls] == ["primary-model", "backup-model"]
+    assert [call["model"] for call in primary.calls] == ["primary-model"]
+    assert [call["model"] for call in fallback_one.calls] == ["fallback-one-model"]
+    assert [call["model"] for call in fallback_two.calls] == ["fallback-two-model"]
 
 
-def test_answer_without_a_fallback_does_not_retry():
+def test_answer_without_fallbacks_does_not_retry():
     client = FlakyClient([RuntimeError("primary boom")], "unused")
     with pytest.raises(RuntimeError, match="primary boom"):
         answer("Rate limiting?", HITS, client=client, model="primary-model")
@@ -245,15 +258,15 @@ def test_answer_without_a_fallback_does_not_retry():
     assert [call["model"] for call in client.calls] == ["primary-model"]
 
 
-def test_answer_does_not_retry_when_the_fallback_equals_the_primary():
+def test_answer_with_empty_fallbacks_does_not_retry():
     client = FlakyClient([RuntimeError("primary boom")], "unused")
     with pytest.raises(RuntimeError, match="primary boom"):
         answer(
             "Rate limiting?",
             HITS,
             client=client,
-            model="same-model",
-            fallback_model="same-model",
+            model="primary-model",
+            fallbacks=[],
         )
 
-    assert [call["model"] for call in client.calls] == ["same-model"]
+    assert [call["model"] for call in client.calls] == ["primary-model"]
