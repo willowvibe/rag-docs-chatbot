@@ -31,10 +31,12 @@ def test_send_area_announces_status_to_screen_readers():
     assert "aria-live" in html
 
 
-def test_dark_tokens_match_the_portfolio_palette():
+def test_light_and_dark_tokens_match_the_redesign_palette():
     css = (WEB / "styles.css").read_text(encoding="utf-8").replace(" ", "")
-    assert "--bg:#0a0f1c" in css
-    assert "--primary:#0ea5e9" in css
+    assert "--paper:#EEF1F4" in css
+    assert "--blue:#1F4E8C" in css
+    assert "--paper:#10151F" in css
+    assert "--blue:#7FA8E8" in css
 
 
 def test_app_js_renders_file_and_page_and_scrolls_to_a_source():
