@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>rag-docs-chatbot</title>
+  <meta name="description" content="Cited answers over your documents, with an eval you can reproduce. A document-QA app with retrieval, citations, refusals and a 40-question golden set.">
+  <meta name="theme-color" content="#0a0f1c">
+  <link rel="canonical" href="https://willowvibe.github.io/rag-docs-chatbot/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="rag-docs-chatbot">
+  <meta property="og:title" content="rag-docs-chatbot">
+  <meta property="og:description" content="Cited answers over your documents, with an eval you can reproduce.">
+  <meta property="og:url" content="https://willowvibe.github.io/rag-docs-chatbot/">
+  <meta property="og:image" content="https://willowvibe.github.io/rag-docs-chatbot/assets/rag-docs-chatbot-demo-poster.jpg">
+  <style>
+    :root {
+      --bg: #0a0f1c;
+      --surface: #111a2c;
+      --surface-raised: #162239;
+      --field: #0b1526;
+      --border: #23324d;
+      --border-strong: #31456a;
+      --text: #e6edf7;
+      --muted: #93a4bf;
+      --primary: #0ea5e9;
+      --primary-strong: #38bdf8;
+      --primary-soft: rgba(14, 165, 233, 0.14);
+      --success: #34d399;
+      --radius: 14px;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      color-scheme: dark;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: clamp(20px, 4vw, 56px) clamp(16px, 4vw, 48px) 40px;
+      background:
+        radial-gradient(900px 500px at 12% -10%, rgba(14, 165, 233, 0.16), transparent 60%),
+        radial-gradient(700px 420px at 100% 0%, rgba(56, 189, 248, 0.08), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--primary-strong); }
+
+    :focus-visible {
+      outline: 3px solid var(--primary-strong);
+      outline-offset: 3px;
+      border-radius: 6px;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 16px;
+      top: -60px;
+      z-index: 10;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #04121f;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .skip-link:focus { top: 16px; }
+
+    .page {
+      width: min(1080px, 100%);
+      margin-inline: auto;
+    }
+
+    .masthead {
+      margin-bottom: clamp(24px, 4vw, 40px);
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--primary-strong);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+    }
+
+    .lede {
+      max-width: 62ch;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 1.6vw, 1.18rem);
+      text-wrap: balance;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 20px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      font-size: 0.94rem;
+      font-weight: 650;
+      text-decoration: none;
+      transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #04121f;
+    }
+
+    .btn-primary:hover { background: var(--primary-strong); }
+
+    .btn-secondary {
+      border-color: var(--border-strong);
+      background: var(--surface-raised);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover { border-color: var(--primary); }
+
+    .results {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 10px;
+      align-items: center;
+      margin: 28px 0 0;
+      padding: 14px 18px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(22, 34, 57, 0.72), rgba(17, 26, 44, 0.92));
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .results strong {
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .results .sep {
+      color: var(--border-strong);
+      font-family: var(--mono);
+    }
+
+    .demo-section {
+      margin-top: clamp(28px, 5vw, 48px);
+    }
+
+    .section-head {
+      margin-bottom: 16px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+      letter-spacing: -0.01em;
+    }
+
+    .section-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .demo-figure {
+      margin: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(22, 34, 57, 0.72), rgba(17, 26, 44, 0.92));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .demo-frame {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      background: #0b1526;
+    }
+
+    .demo-video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #0b1526;
+    }
+
+    .play-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, rgba(10, 15, 28, 0.42), rgba(10, 15, 28, 0.05) 62%);
+      pointer-events: none;
+    }
+
+    .play-overlay[hidden] { display: none; }
+
+    .play-button {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: #fff;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .play-circle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      background: rgba(230, 237, 247, 0.96);
+      color: #04121f;
+      box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.7);
+      transition: transform 120ms ease, background-color 120ms ease;
+    }
+
+    .play-button:hover .play-circle {
+      transform: scale(1.06);
+      background: #fff;
+    }
+
+    .play-circle svg { margin-left: 3px; }
+
+    .play-text {
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: rgba(10, 15, 28, 0.66);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+      font-size: 0.83rem;
+      font-weight: 600;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
+    }
+
+    .unmute-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 12px;
+      border: 1px solid rgba(230, 237, 247, 0.28);
+      border-radius: 999px;
+      background: rgba(10, 15, 28, 0.66);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
+      color: #fff;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 120ms ease;
+    }
+
+    .unmute-btn:hover { background: rgba(10, 15, 28, 0.86); }
+    .unmute-btn[hidden] { display: none; }
+
+    .demo-figure figcaption {
+      padding: 14px 18px 16px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .demo-figure figcaption a {
+      color: var(--primary-strong);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .demo-figure figcaption a:hover { text-decoration: underline; }
+
+    .footnote {
+      width: min(1080px, 100%);
+      margin: 26px auto 0;
+      color: #6b7c99;
+      font-size: 0.78rem;
+    }
+
+    .footnote p { margin: 0; }
+
+    @media (max-width: 640px) {
+      .actions .btn { flex: 1 1 100%; }
+
+      .demo-frame { aspect-ratio: 16 / 10; }
+
+      .play-circle { width: 62px; height: 62px; }
+
+      .unmute-btn { top: 10px; right: 10px; padding: 6px 10px; font-size: 0.72rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#demo">Skip to the demo</a>
+
+  <main class="page">
+    <header class="masthead">
+      <p class="eyebrow">Document QA &middot; retrieval + citations</p>
+      <h1>rag-docs-chatbot</h1>
+      <p class="lede">Cited answers over your documents, with an eval you can reproduce</p>
+
+      <div class="actions">
+        <a class="btn btn-primary" href="https://rag-docs-chatbot-three.vercel.app">Try the live demo</a>
+        <a class="btn btn-secondary" href="https://github.com/willowvibe/rag-docs-chatbot">Source on GitHub</a>
+        <a class="btn btn-secondary" href="https://github.com/willowvibe/rag-docs-chatbot/blob/main/eval/report.md">Eval report</a>
+      </div>
+
+      <div class="results" role="note" aria-label="Evaluation results">
+        <span><strong>Evidence hit@5</strong> 87.5%</span>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <span><strong>MRR</strong> 0.713</span>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <span><strong>Faithfulness</strong> 0.97 (self-judged)</span>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <span><strong>92.5%</strong> with hybrid + reranker</span>
+      </div>
+    </header>
+
+    <section id="demo" class="demo-section" aria-labelledby="demo-title">
+      <div class="section-head">
+        <h2 id="demo-title">85-second walkthrough</h2>
+        <p>Cited answer, reasoning, refusal, rate-limit lock and the eval that backs the numbers.</p>
+      </div>
+
+      <figure class="demo-figure">
+        <div class="demo-frame" id="demo-frame">
+          <video
+            class="demo-video"
+            id="demo-video"
+            autoplay
+            muted
+            playsinline
+            controls
+            preload="auto"
+            poster="assets/rag-docs-chatbot-demo-poster.jpg"
+            aria-label="Narrated rag-docs-chatbot walkthrough">
+            <source src="assets/rag-docs-chatbot-demo.mp4" type="video/mp4">
+            <source src="https://github.com/willowvibe/rag-docs-chatbot/releases/download/v1.0.0/rag-docs-chatbot-demo.mp4" type="video/mp4">
+            Your browser cannot play this video.
+            <a href="https://github.com/willowvibe/rag-docs-chatbot/releases/download/v1.0.0/rag-docs-chatbot-demo.mp4">Download the demo from the v1.0.0 release.</a>
+          </video>
+
+          <div class="play-overlay" id="play-overlay">
+            <button class="play-button" id="play-button" type="button" aria-label="Play the demo with audio">
+              <span class="play-circle">
+                <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5-13-7.5Z" fill="currentColor"/></svg>
+              </span>
+              <span class="play-text">Play demo</span>
+            </button>
+          </div>
+
+          <button class="unmute-btn" id="unmute-btn" type="button" aria-label="Unmute demo audio" hidden>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4V5Z"/>
+              <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+              <path d="M18.5 5.5a9 9 0 0 1 0 13"/>
+            </svg>
+            Unmute
+          </button>
+        </div>
+        <figcaption>
+          The video streams the full narrated walkthrough. If the local copy has not been
+          fetched yet, the player falls back to the
+          <a href="https://github.com/willowvibe/rag-docs-chatbot/releases/download/v1.0.0/rag-docs-chatbot-demo.mp4">v1.0.0 release asset</a>.
+          <a href="https://github.com/willowvibe/rag-docs-chatbot">Source on GitHub</a>
+        </figcaption>
+      </figure>
+    </section>
+  </main>
+
+  <footer class="footnote">
+    <p>MIT licensed. Corpus documents are U.S. Government works in the public domain.</p>
+  </footer>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var video = document.getElementById('demo-video');
+      if (!video) { return; }
+
+      var frame = document.getElementById('demo-frame');
+      var playOverlay = document.getElementById('play-overlay');
+      var playButton = document.getElementById('play-button');
+      var unmuteButton = document.getElementById('unmute-btn');
+      var motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+      var observer = null;
+
+      function isPaused() {
+        return video.paused || video.ended;
+      }
+
+      function syncPlayerState() {
+        var paused = isPaused();
+        if (playOverlay) { playOverlay.hidden = !paused; }
+        if (unmuteButton) { unmuteButton.hidden = !(video.muted && !paused); }
+        if (frame) { frame.classList.toggle('is-playing', !paused); }
+      }
+
+      function playVideo() {
+        var attempt = video.play();
+        if (attempt && typeof attempt.catch === 'function') {
+          attempt.catch(function () { syncPlayerState(); });
+        }
+      }
+
+      function stopAutoplay() {
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+        video.pause();
+        syncPlayerState();
+      }
+
+      function startAutoplay() {
+        if (observer) { return; }
+        playVideo();
+        if (typeof IntersectionObserver !== 'function') { return; }
+        observer = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              playVideo();
+            } else {
+              video.pause();
+            }
+          });
+        }, { threshold: 0.25 });
+        observer.observe(video);
+      }
+
+      function playWithSound() {
+        video.muted = false;
+        video.volume = 1;
+        playVideo();
+        syncPlayerState();
+      }
+
+      if (playButton) {
+        playButton.addEventListener('click', playWithSound);
+      }
+
+      if (unmuteButton) {
+        unmuteButton.addEventListener('click', playWithSound);
+      }
+
+      ['play', 'pause', 'ended', 'volumechange', 'loadedmetadata'].forEach(function (eventName) {
+        video.addEventListener(eventName, syncPlayerState);
+      });
+
+      function applyMotionPreference() {
+        if (motionQuery && motionQuery.matches) {
+          video.autoplay = false;
+          stopAutoplay();
+        } else {
+          startAutoplay();
+        }
+      }
+
+      applyMotionPreference();
+      syncPlayerState();
+
+      if (motionQuery) {
+        if (typeof motionQuery.addEventListener === 'function') {
+          motionQuery.addEventListener('change', applyMotionPreference);
+        } else if (typeof motionQuery.addListener === 'function') {
+          motionQuery.addListener(applyMotionPreference);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

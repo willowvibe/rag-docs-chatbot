@@ -4,6 +4,10 @@ Ask your documents, get cited answers — plus an eval score you can reproduce.
 
 **Live demo:** https://rag-docs-chatbot-three.vercel.app — 8 questions per visitor per hour.
 
+[![rag-docs-chatbot demo: cited answer, reasoning, refusal, rate-limit lock, eval](docs/assets/rag-docs-chatbot-demo.gif)](https://willowvibe.github.io/rag-docs-chatbot/#demo)
+
+Full 85-second walkthrough with narration: https://willowvibe.github.io/rag-docs-chatbot/
+
 This repository is a document-QA app over a small, public-domain corpus. Answers are
 generated from retrieved passages and carry citations back to the source document, and
 the retrieval pipeline ships with an eval harness so the numbers can be regenerated from
@@ -15,8 +19,7 @@ embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud (co
 model, default `glm-5.3-flash`) grounded in retrieved passages with `[n]` citations and an
 explicit refusal; a rate-limited FastAPI service and
 web UI; a 40-question eval harness; a Docker quickstart; and CI. If the primary model call
-fails, the API retries once on the fallback model (`RAG_FALLBACK_MODEL`). A demo video is
-coming.
+fails, the API retries once on the fallback model (`RAG_FALLBACK_MODEL`).
 
 ## Results
 
