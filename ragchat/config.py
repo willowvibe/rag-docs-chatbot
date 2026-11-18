@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 
 DEFAULT_MODELS = {
     "ollama": ("glm-5.3-flash", "glm-5.3-flash"),
+    "openrouter": (
+        "inclusionai/ling-3.2-flash:free",
+        "inclusionai/ling-3.2-flash:free",
+    ),
     "anthropic": ("claude-sonnet-5-5", "claude-haiku-5-5"),
 }
 
@@ -18,6 +22,10 @@ DEFAULT_FALLBACK_CHAIN = {
         ("ollama", "deepseek-v4.1-flash:1017"),
         ("openrouter", "inclusionai/ling-3.2-flash:free"),
         ("openrouter", "nvidia/nemotron-3.5-super-vl:free"),
+    ],
+    "openrouter": [
+        ("openrouter", "nvidia/nemotron-3.5-super-vl:free"),
+        ("ollama", "glm-5.3-flash"),
     ],
     "anthropic": [],
 }

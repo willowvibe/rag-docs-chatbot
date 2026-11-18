@@ -54,6 +54,44 @@ def test_health_reports_chunk_count(monkeypatch):
     assert _client(monkeypatch).get("/api/health").json() == {"status": "ok", "chunks": 42}
 
 
+def test_info_marks_a_free_model(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setattr(
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(),
+            llm_provider="openrouter",
+            model="inclusionai/ling-3.2-flash:free",
+        ),
+    )
+
+    assert client.get("/api/info").json() == {
+        "model": "inclusionai/ling-3.2-flash:free",
+        "provider": "openrouter",
+        "free": True,
+    }
+
+
+def test_info_marks_a_paid_model_as_not_free(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setattr(
+        api,
+        "_settings",
+        lambda: replace(
+            load_settings(),
+            llm_provider="ollama",
+            model="glm-5.3-flash",
+        ),
+    )
+
+    assert client.get("/api/info").json() == {
+        "model": "glm-5.3-flash",
+        "provider": "ollama",
+        "free": False,
+    }
+
+
 def _documents_client(monkeypatch, documents, manifest_path):
     store = FakeStore(documents)
     monkeypatch.setattr(api, "MANIFEST_PATH", manifest_path)

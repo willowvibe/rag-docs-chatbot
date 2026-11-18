@@ -13,6 +13,7 @@
   var documentList = document.getElementById("document-list");
   var exampleChips = document.getElementById("example-chips");
   var howToFallback = document.getElementById("how-to-fallback");
+  var poweredBy = document.getElementById("powered-by");
   var exampleButtons = [];
   var busy = false;
   var locked = false;
@@ -30,6 +31,50 @@
 
   function scrollToLatest() {
     transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function shortModelName(model) {
+    if (typeof model !== "string" || !model) {
+      return "";
+    }
+    var name = model.slice(model.lastIndexOf("/") + 1);
+    return name.replace(/:free$/, "");
+  }
+
+  function renderInfo(payload) {
+    if (!poweredBy) {
+      return;
+    }
+    var model = payload && typeof payload.model === "string" ? payload.model : "";
+    var shortName = shortModelName(model);
+    if (!shortName) {
+      return;
+    }
+    var free = payload && payload.free === true;
+    poweredBy.textContent = free
+      ? "Powered by " +
+        shortName +
+        " — a free open model via OpenRouter. Answers can take a few seconds."
+      : "Powered by " + model;
+    poweredBy.hidden = false;
+  }
+
+  function loadInfo() {
+    if (!poweredBy) {
+      return;
+    }
+    fetch("/api/info", { headers: { Accept: "application/json" } })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("info unavailable");
+        }
+        return response.json();
+      })
+      .then(renderInfo)
+      .catch(function () {
+        poweredBy.textContent = "";
+        poweredBy.hidden = true;
+      });
   }
 
   function updateExampleButtons() {
@@ -350,12 +395,24 @@
     updateExampleButtons();
   }
 
-  function renderAnswer(text, citations) {
+  function appendAnswerMeta(node, model) {
+    var shortName = shortModelName(model);
+    if (!shortName) {
+      return;
+    }
+    var meta = document.createElement("p");
+    meta.className = "answer-meta";
+    meta.textContent = "via " + shortName;
+    node.appendChild(meta);
+  }
+
+  function renderAnswer(text, citations, model) {
     var node = addMessage("answer", "");
     node.textContent = "";
 
     if (!text) {
       node.textContent = "No answer was returned.";
+      appendAnswerMeta(node, model);
       return;
     }
 
@@ -403,6 +460,7 @@
       node.appendChild(document.createTextNode(text.slice(lastIndex)));
     }
 
+    appendAnswerMeta(node, model);
     scrollToLatest();
   }
 
@@ -474,6 +532,12 @@
     input.value = "";
     setBusy(true);
     setStatus("Searching the documents…", "busy");
+    var slowTimer = window.setTimeout(function () {
+      setStatus(
+        "Waiting for the model — free models can take a few seconds…",
+        "busy"
+      );
+    }, 1500);
 
     fetch("/api/chat", {
       method: "POST",
@@ -505,7 +569,7 @@
       })
       .then(function (payload) {
         var citations = payload.citations || [];
-        renderAnswer(payload.answer || "", citations);
+        renderAnswer(payload.answer || "", citations, payload.model);
         renderSources(citations);
         var count = citations.length;
         setStatus(
@@ -520,6 +584,7 @@
         setStatus(message, "error");
       })
       .then(function () {
+        window.clearTimeout(slowTimer);
         setBusy(false);
         input.focus();
       });
@@ -581,4 +646,5 @@
   });
 
   loadHowTo();
+  loadInfo();
 })();

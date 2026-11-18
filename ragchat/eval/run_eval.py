@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
+import time
 from pathlib import Path
 
 import psycopg
@@ -48,6 +50,51 @@ def _citation_hit(citation, used_hits):
     )
 
 
+def _min_interval_from_env() -> float:
+    """Minimum seconds between LLM call starts; 0 keeps the eval unpaced."""
+    raw = os.environ.get("EVAL_MIN_INTERVAL_SECONDS", "")
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 0.0
+
+
+class _Pacer:
+    """Sleep only the remaining gap between the starts of consecutive calls."""
+
+    def __init__(self, interval: float):
+        self.interval = interval
+        self._last_start: float | None = None
+
+    def wait(self) -> None:
+        if self.interval <= 0:
+            return
+        now = time.monotonic()
+        if self._last_start is not None:
+            remaining = self.interval - (now - self._last_start)
+            if remaining > 0:
+                time.sleep(remaining)
+                now = time.monotonic()
+        self._last_start = now
+
+
+class _PacedMessages:
+    def __init__(self, messages, pacer: _Pacer):
+        self._messages = messages
+        self._pacer = pacer
+
+    def create(self, **kwargs):
+        self._pacer.wait()
+        return self._messages.create(**kwargs)
+
+
+class _PacedClient:
+    """Client proxy that paces each messages.create call in the eval."""
+
+    def __init__(self, client, pacer: _Pacer):
+        self.messages = _PacedMessages(client.messages, pacer)
+
+
 def _judge(client, model: str, question: str, answer_text: str,
            sources: str) -> float | None:
     response = client.messages.create(
@@ -70,6 +117,9 @@ def run_eval(golden_path: Path, store: Store, embedder: Embedder, client,
              model: str, k: int = 5, reranker=None,
              candidates: int | None = None, hybrid: bool = False) -> dict:
     items = load_golden(golden_path)
+    min_interval = _min_interval_from_env()
+    if min_interval > 0:
+        client = _PacedClient(client, _Pacer(min_interval))
     hits_ok = 0
     rr_total = 0.0
     grounded = 0
@@ -203,7 +253,7 @@ Corpus: {total_chunks} chunks across the golden files ({per_file}) · k = {resul
 |---|---|---|---|---|---|---|---|
 {rows}
 
-Reproduce with `make eval` (needs `OLLAMA_API_KEY` (or `ANTHROPIC_API_KEY` with LLM_PROVIDER=anthropic) and an ingested corpus).
+Reproduce with `make eval` (needs `OLLAMA_API_KEY`, or `OPENROUTER_API_KEY` with LLM_PROVIDER=openrouter, or `ANTHROPIC_API_KEY` with LLM_PROVIDER=anthropic, plus an ingested corpus).
 """
 
 

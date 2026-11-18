@@ -2,7 +2,10 @@
 
 Ask your documents, get cited answers — plus an eval score you can reproduce.
 
-**Live demo:** https://rag-docs-chatbot-three.vercel.app — 8 questions per visitor per rolling 60-minute window.
+**Live demo:** https://rag-docs-chatbot-three.vercel.app — the public demo runs on the
+free open model `inclusionai/ling-3.2-flash` via OpenRouter, so answers can take a few
+seconds and free providers may log prompts. 8 questions per visitor per rolling 60-minute
+window.
 
 [![rag-docs-chatbot demo: cited answer, reasoning, refusal, rate-limit lock, eval](docs/assets/rag-docs-chatbot-demo.gif)](https://willowvibe.github.io/rag-docs-chatbot/#demo)
 
@@ -15,18 +18,23 @@ a fresh clone. Optionally, cross-encoder reranking retrieves N candidates and re
 them down to the top-k passages used for the answer.
 
 **Status:** pre-release. What works today: PDF, Markdown and HTML ingestion; local BGE
-embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud (configurable
-model, default `glm-5.3-flash`) grounded in retrieved passages with `[n]` citations and an
-explicit refusal; a rate-limited FastAPI service and
-web UI; a 40-question eval harness; a Docker quickstart; and CI. If the primary model call
-fails, the API walks an ordered fallback chain that can span Ollama Cloud and OpenRouter
-(`RAG_FALLBACK_MODELS`).
+embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud, OpenRouter,
+or Anthropic (configurable model) grounded in retrieved passages with `[n]` citations and
+an explicit refusal; a rate-limited FastAPI service and web UI; a 40-question eval harness;
+a Docker quickstart; and CI. The public demo runs on the free open model
+`inclusionai/ling-3.2-flash` via OpenRouter (answers can take a few seconds; free providers
+may log prompts), with `nvidia/nemotron-3.5-super-vl:free` and then `glm-5.3-flash` on
+Ollama Cloud as fallbacks. If the primary model call fails, the API walks an ordered
+fallback chain that can span Ollama Cloud and OpenRouter (`RAG_FALLBACK_MODELS`). The code
+default provider stays Ollama Cloud for self-hosters.
 
 ## Results
 
 The numbers below come from one recorded run of `make eval` ([eval/report.md](eval/report.md))
 on the 40-question golden set with the live demo's configuration (vector retrieval, no
-reranker, `glm-5.3-flash`, k = 5):
+reranker, the free `inclusionai/ling-3.2-flash:free` via OpenRouter, k = 5). The earlier
+primary, `glm-5.3-flash` on Ollama Cloud, scored the same on every metric below except
+faithfulness (0.97 vs 0.967):
 
 | Metric | Value |
 |---|---|
@@ -35,23 +43,25 @@ reranker, `glm-5.3-flash`, k = 5):
 | Citation contains the evidence | 87.5% |
 | Faithfulness (LLM judge) | 0.97 |
 
+For free OpenRouter models run `LLM_PROVIDER=openrouter EVAL_MIN_INTERVAL_SECONDS=3.2 make eval` (≈19 calls/min).
+
 With hybrid search plus the MiniLM reranker (on in Docker Compose), evidence hit@5 rises to
 92.5% and MRR to 0.805 (measured separately, see the hybrid/rerank paragraph below).
 
 **Caveats:**
 
 - Faithfulness is judged by the same model that answers, so it is self-assessed.
-- The judge scored one correct refusal ("I don't know based on the provided documents",
-  q37) as 0.0 — that single question is the whole gap below 1.0.
+- The judge marked two answers (q03, q38) as partly unsupported (0.33 each); that is the
+  whole gap below 1.0. Under the earlier `glm-5.3-flash` judge the gap came instead from one
+  correct refusal (q37) scored 0.0, so treat the score as indicative, not precise.
 - Five questions (q25, q32, q35, q37, q38) miss retrieval entirely, mostly
   everyday-wording paraphrases — the main known weakness.
 
 ## Quick start
 
-Requires Docker and Python 3.12. Answering needs an `OLLAMA_API_KEY` (Ollama Cloud), or an `ANTHROPIC_API_KEY` with
-`LLM_PROVIDER=anthropic`; an optional `OPENROUTER_API_KEY` enables the free OpenRouter
-fallbacks. Ingestion,
-retrieval and the tests work without a key.
+Requires Docker and Python 3.12. Answering needs an `OLLAMA_API_KEY` (Ollama Cloud), an
+`OPENROUTER_API_KEY` with `LLM_PROVIDER=openrouter`, or an `ANTHROPIC_API_KEY` with
+`LLM_PROVIDER=anthropic`. Ingestion, retrieval and the tests work without a key.
 
 ```bash
 python3 -m venv .venv
@@ -81,14 +91,14 @@ with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
 |---|---|
 | `DATABASE_URL` | `postgresql://rag:rag@localhost:5433/rag` |
 | `RAG_DB_PORT` | `5433` |
-| `LLM_PROVIDER` | `ollama` (or `anthropic`) |
+| `LLM_PROVIDER` | `ollama` (or `openrouter`, `anthropic`) |
 | `OLLAMA_API_KEY` | empty |
 | `OLLAMA_HOST` | `https://ollama.com` |
 | `ANTHROPIC_API_KEY` | empty (only with `LLM_PROVIDER=anthropic`) |
-| `OPENROUTER_API_KEY` | empty (enables OpenRouter fallbacks) |
-| `RAG_MODEL` | `glm-5.3-flash` (anthropic: `claude-sonnet-5-5`) |
-| `RAG_CHEAP_MODEL` | `glm-5.3-flash` (anthropic: `claude-haiku-5-5`) |
-| `RAG_FALLBACK_MODELS` | `ollama:deepseek-v4.1-flash:1017,openrouter:inclusionai/ling-3.2-flash:free,openrouter:nvidia/nemotron-3.5-super-vl:free` (anthropic: none) |
+| `OPENROUTER_API_KEY` | empty (required for `LLM_PROVIDER=openrouter`; also enables OpenRouter fallbacks) |
+| `RAG_MODEL` | `glm-5.3-flash` (openrouter: `inclusionai/ling-3.2-flash:free`; anthropic: `claude-sonnet-5-5`) |
+| `RAG_CHEAP_MODEL` | `glm-5.3-flash` (openrouter: `inclusionai/ling-3.2-flash:free`; anthropic: `claude-haiku-5-5`) |
+| `RAG_FALLBACK_MODELS` | ollama: `ollama:deepseek-v4.1-flash:1017,openrouter:inclusionai/ling-3.2-flash:free,openrouter:nvidia/nemotron-3.5-super-vl:free` (openrouter: `openrouter:nvidia/nemotron-3.5-super-vl:free,ollama:glm-5.3-flash`; anthropic: none) |
 | `RAG_FALLBACK_MODEL` | **legacy**: a single model for the active provider; use `RAG_FALLBACK_MODELS` instead |
 | `RAG_THINK` | `0` (off; Ollama thinking mode is off because reasoning tokens count against the answer budget and caused empty answers) |
 | `RAG_TOP_K` | `5` |
@@ -116,17 +126,20 @@ On the 40-question grounding eval, `glm-5.3-flash` scored 87.5%,
 `inclusionai/ling-3.2-flash:free` 87.5%, and `nvidia/nemotron-3.5-super-vl:free` 85.0%,
 all with 0 errors. Free OpenRouter models can be rate-limited (an HTTP 429 counts as a
 failed attempt and moves to the next model), and many free providers log prompts, so
-visitors' questions may be retained by those providers when a fallback is used.
+visitors' questions may be retained by those providers when an OpenRouter model is used —
+including the demo's primary `ling-3.2-flash`.
 
 Hybrid search fuses vector and keyword results with reciprocal rank fusion (k=60). On the 40-question golden set, hybrid + MiniLM reranking of 15 candidates raised evidence hit@5 0.875 -> 0.925 and MRR@5 0.713 -> 0.805 versus vector-only, adding about 1.25 s per question on a 16-thread CPU (reranking costs ~78 ms per candidate; search itself ~60 ms).
 
 ## Deploy
 
 The app runs in two lanes. **Self-host** means running it locally or in Docker with your
-own `OLLAMA_API_KEY` (or Anthropic key). **Hosted demo** means running it on Vercel, where the owner's key
-lives in the project's environment variables — never in the browser — and per-IP and
-per-day limits backstop it. `RATE_LIMIT_ENABLED` ships as `0`; only the demo deployment
-sets it to `1`. An `OPENROUTER_API_KEY` is optional and enables the free fallback models.
+own `OLLAMA_API_KEY` (or OpenRouter/Anthropic key). **Hosted demo** means running it on
+Vercel, where the owner's key lives in the project's environment variables — never in the
+browser — and per-IP and per-day limits backstop it. `RATE_LIMIT_ENABLED` ships as `0`;
+only the demo deployment sets it to `1`. The hosted demo uses
+`LLM_PROVIDER=openrouter` with the free open model `inclusionai/ling-3.2-flash`, falling
+back to `nvidia/nemotron-3.5-super-vl:free` and then Ollama Cloud's `glm-5.3-flash`.
 
 Prerequisites:
 
@@ -144,7 +157,9 @@ inside the deployment.
 
 Set these in the Vercel project settings:
 
-- `OLLAMA_API_KEY` (or `LLM_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY`)
+- `LLM_PROVIDER=openrouter`
+- `OPENROUTER_API_KEY`
+- `OLLAMA_API_KEY` (enables the final `glm-5.3-flash` fallback)
 - `DATABASE_URL`
 - `RATE_LIMIT_ENABLED=1` (demo only; the shipped default is `0`)
 - `PER_IP_PER_HOUR=8`
