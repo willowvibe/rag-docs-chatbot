@@ -1,4 +1,7 @@
-"""Per-IP and global counters in Postgres. No-op unless RATE_LIMIT_ENABLED=1."""
+"""Per-IP rolling-window and global daily counters in Postgres.
+
+No-op unless RATE_LIMIT_ENABLED=1.
+"""
 
 from __future__ import annotations
 
@@ -19,6 +22,12 @@ CREATE TABLE IF NOT EXISTS rate_counters (
 );
 CREATE INDEX IF NOT EXISTS rate_counters_expires_at
     ON rate_counters (expires_at);
+CREATE TABLE IF NOT EXISTS rate_events (
+    ip_hash TEXT NOT NULL,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rate_events_ip_hash_at
+    ON rate_events (ip_hash, at);
 """
 
 _INCR = """
@@ -37,7 +46,28 @@ RETURNING n
 """
 
 _CLEANUP = "DELETE FROM rate_counters WHERE expires_at < now()"
-_IP_TTL = 3700
+
+_ADVISORY_LOCK = "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))"
+_DELETE_IP_OLD = (
+    "DELETE FROM rate_events"
+    " WHERE ip_hash = %s AND at < now() - interval '60 minutes'"
+)
+_DELETE_ALL_OLD = "DELETE FROM rate_events WHERE at < now() - interval '60 minutes'"
+_COUNT_WINDOW = """
+SELECT count(*), min(at)
+FROM rate_events
+WHERE ip_hash = %s AND at > now() - interval '60 minutes'
+"""
+_OLDEST_EXPIRY = """
+SELECT GREATEST(
+    1,
+    ceil(extract(epoch FROM (min(at) + interval '60 minutes' - now())))
+)::int
+FROM rate_events
+WHERE ip_hash = %s AND at > now() - interval '60 minutes'
+"""
+_INSERT_EVENT = "INSERT INTO rate_events (ip_hash) VALUES (%s)"
+
 _DAY_TTL = 90000
 
 _conn: psycopg.Connection | None = None
@@ -48,15 +78,16 @@ _schema_ready = False
 _lock = threading.Lock()
 
 
-def _ip_key(ip: str, hour: int | None = None) -> str:
-    if hour is None:
-        hour = int(time.time() // 3600)
-    digest = hashlib.sha256(ip.encode()).hexdigest()[:32]
-    return f"rag:ip:{digest}:{hour}"
+def _ip_hash(ip: str) -> str:
+    return hashlib.sha256(ip.encode()).hexdigest()[:32]
 
 
 def _day_key() -> str:
     return f"rag:day:{dt.date.today().isoformat()}"
+
+
+def _seconds_until_utc_midnight() -> int:
+    return 86400 - (int(time.time()) % 86400)
 
 
 def _ensure_schema(conn: psycopg.Connection) -> None:
@@ -89,28 +120,55 @@ def _discard_connection() -> None:
             pass
 
 
-def _consume(conn: psycopg.Connection, ip_key: str, day_key: str) -> tuple[int, int]:
+def _consume(
+    conn: psycopg.Connection,
+    ip_hash: str,
+    day_key: str,
+    per_ip: int,
+    daily_cap: int,
+) -> tuple[bool, int, str | None, int]:
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute(_INCR, (ip_key, _IP_TTL))
-            used = int(cur.fetchone()[0])
+            # Serialise concurrent requests from the same IP for this transaction.
+            cur.execute(_ADVISORY_LOCK, (ip_hash,))
+            cur.execute(_DELETE_IP_OLD, (ip_hash,))
+            cur.execute(_DELETE_ALL_OLD)
+            cur.execute(_CLEANUP)
+
+            cur.execute(_COUNT_WINDOW, (ip_hash,))
+            count, _oldest = cur.fetchone()
+            count = int(count)
+
+            if count >= per_ip:
+                cur.execute(_OLDEST_EXPIRY, (ip_hash,))
+                retry_after = int(cur.fetchone()[0])
+                return False, 0, "per_ip", retry_after
+
             cur.execute(_INCR, (day_key, _DAY_TTL))
             spent_today = int(cur.fetchone()[0])
-            cur.execute(_CLEANUP)
-    return used, spent_today
+            if spent_today > daily_cap:
+                return False, 0, "daily", _seconds_until_utc_midnight()
+
+            cur.execute(_INSERT_EVENT, (ip_hash,))
+            cur.execute(_OLDEST_EXPIRY, (ip_hash,))
+            retry_after = int(cur.fetchone()[0])
+
+    return True, per_ip - (count + 1), None, retry_after
 
 
-def check_and_consume(ip: str) -> tuple[bool, int, str | None]:
-    """Returns (allowed, remaining_for_this_ip, reason).
+def check_and_consume(ip: str) -> tuple[bool, int, str | None, int]:
+    """Returns (allowed, remaining_for_this_ip, reason, retry_after_seconds).
 
     remaining is -1 and reason is None when limiting is off. When blocked, reason
-    is "daily" for the global cap or "per_ip" for the per-IP cap.
+    is "daily" for the global cap or "per_ip" for the per-IP cap. retry_after is
+    the seconds until the oldest event in the rolling window expires (per-IP) or
+    until UTC midnight (daily).
     """
     settings = load_settings()
     if not settings.rate_limit_enabled:
-        return True, -1, None
+        return True, -1, None, 0
 
-    ip_key = _ip_key(ip)
+    ip_hash = _ip_hash(ip)
     day_key = _day_key()
 
     with _lock:
@@ -118,15 +176,17 @@ def check_and_consume(ip: str) -> tuple[bool, int, str | None]:
             try:
                 conn = _connection()
                 _ensure_schema(conn)
-                used, spent_today = _consume(conn, ip_key, day_key)
+                result = _consume(
+                    conn,
+                    ip_hash,
+                    day_key,
+                    settings.per_ip_per_hour,
+                    settings.daily_cap,
+                )
                 break
             except (psycopg.OperationalError, psycopg.InterfaceError):
                 _discard_connection()
                 if attempt == 1:
                     raise
 
-    if spent_today > settings.daily_cap:
-        return False, 0, "daily"
-    if used > settings.per_ip_per_hour:
-        return False, 0, "per_ip"
-    return True, settings.per_ip_per_hour - used, None
+    return result

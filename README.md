@@ -2,7 +2,7 @@
 
 Ask your documents, get cited answers — plus an eval score you can reproduce.
 
-**Live demo:** https://rag-docs-chatbot-three.vercel.app — 8 questions per visitor per hour.
+**Live demo:** https://rag-docs-chatbot-three.vercel.app — 8 questions per visitor per rolling 60-minute window.
 
 [![rag-docs-chatbot demo: cited answer, reasoning, refusal, rate-limit lock, eval](docs/assets/rag-docs-chatbot-demo.gif)](https://willowvibe.github.io/rag-docs-chatbot/#demo)
 
@@ -70,7 +70,7 @@ See [docs/architecture.md](docs/architecture.md) for the ingest and query paths.
 Every environment read lives in `ragchat/config.py`. Copy `.env.example` to `.env` and
 fill in what you need; the app runs without an LLM key for tests and offline work.
 Rate limiting (the demo lane) is off by default; when enabled, its counters live in the
-same Postgres database.
+same Postgres database and the per-visitor limit is a rolling 60-minute window.
 
 If another Postgres already holds port 5433, bring the database up on a different host port
 with `RAG_DB_PORT=5435 make up` and point `DATABASE_URL` at the same port.
@@ -114,7 +114,8 @@ Prerequisites:
 - A Postgres database with the `vector` extension (the Neon free tier works).
 - This repository imported as a Vercel project.
 
-Rate-limit counters live in a `rate_counters` table in the same Postgres, and IPs are
+Rate-limit counters live in a `rate_counters` table in the same Postgres, per-IP hits
+live in a `rate_events` table that implements the rolling 60-minute window, and IPs are
 stored only as truncated SHA-256 hashes.
 
 Ingest against the hosted database **before** the first request: point `DATABASE_URL` at
@@ -131,9 +132,9 @@ Set these in the Vercel project settings:
 - `DAILY_CAP=500`
 - `FASTEMBED_CACHE_PATH=/tmp/fastembed`
 
-The live demo uses 8 questions per visitor per hour and a daily cap of 500, and the page
-shows visitors how many questions they have left, warns at 2 left, and disables the input
-with a countdown at 0.
+The live demo uses 8 questions per visitor per rolling 60-minute window and a daily cap
+of 500, and the page shows visitors how many questions they have left, warns at 2 left,
+and disables the input with a countdown at 0.
 
 The API key and database URL carry deployment-specific credentials; keep them in the
 project settings and out of the repository. `FASTEMBED_CACHE_PATH` is set explicitly because the function
@@ -157,8 +158,8 @@ If the Python bundle exceeds Vercel's size limit, the same `Dockerfile` runs unc
 Render or Fly — which is why the app contains no Vercel-specific code.
 
 To confirm the limits actually bite, run this against a deployment with
-`RATE_LIMIT_ENABLED=1`. Run it **once, on a fresh hour, from a single machine**: the
-per-IP counter is per hour, so a second run in the same hour begins with `429`s. Vercel
+`RATE_LIMIT_ENABLED=1`. Run it **once, from a single machine**: the per-IP limit is a
+rolling 60-minute window, so a second run within the next hour begins with `429`s. Vercel
 overwrites a client-supplied `X-Forwarded-For` and sets `x-real-ip` to the same value, so
 the `x-forwarded-for` header below is inert on Vercel; the loop works because all 9
 requests share one public IP. The header is kept because a non-Vercel proxy would honour
