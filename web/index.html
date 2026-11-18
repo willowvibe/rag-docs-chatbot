@@ -3,23 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ask the documents</title>
+  <title>Ask the NIST identity guidelines · rag-docs-chatbot</title>
   <meta name="description" content="Cited answers from a small public-domain corpus of NIST digital identity guidelines.">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
   <a class="skip-link" href="#question">Skip to the question box</a>
 
-  <header class="masthead">
-    <p class="eyebrow">Document Q&amp;A</p>
-    <h1>Ask the documents</h1>
-    <p class="lede">Answers use only the retrieved passages, and every claim carries the file and page to check.</p>
+  <header class="site-header">
+    <div class="brand">
+      <p class="eyebrow">rag-docs-chatbot</p>
+      <h1>Ask the NIST digital identity guidelines</h1>
+    </div>
+    <p id="powered-by" class="powered-by">Free open model via OpenRouter &middot; answers can take a few seconds</p>
   </header>
 
   <main class="workspace">
-    <section class="chat-pane" aria-labelledby="chat-heading">
-      <h2 id="chat-heading" class="pane-title">Conversation</h2>
-      <p id="powered-by" class="powered-by" hidden></p>
+    <section class="card chat-pane" aria-labelledby="chat-heading">
+      <div class="pane-head">
+        <h2 id="chat-heading" class="pane-title">Conversation</h2>
+      </div>
 
       <div id="transcript" class="transcript" role="log" aria-live="polite" aria-relevant="additions">
         <section class="how-to" id="how-to" aria-labelledby="how-to-heading">
@@ -27,9 +31,9 @@
           <ul id="document-list" class="document-list"></ul>
           <p id="how-to-fallback" class="how-to-fallback" hidden>Ask a question about the documents in this demo.</p>
           <div id="example-chips" class="example-chips"></div>
-          <p class="how-to-hint">Answers cite sources like <span class="marker-sample">[1]</span> — click one to see the page.</p>
-          <p class="how-to-hint">It says "I don't know" when the documents don't cover a question.</p>
-          <p class="how-to-run"><a href="https://github.com/willowvibe/rag-docs-chatbot#quick-start" target="_blank" rel="noopener">Want your own documents? Run it locally →</a></p>
+          <p class="how-to-hint">Answers cite sources like <span class="marker-sample">[1]</span> &mdash; click one to see the page.</p>
+          <p class="how-to-hint">It says &ldquo;I don&rsquo;t know&rdquo; when the documents don&rsquo;t cover a question.</p>
+          <p class="how-to-run"><a href="https://github.com/willowvibe/rag-docs-chatbot#quick-start" target="_blank" rel="noopener">Run it locally &rarr;</a></p>
         </section>
       </div>
 
@@ -46,9 +50,11 @@
       </form>
     </section>
 
-    <aside class="sources-pane" aria-labelledby="sources-heading">
-      <h2 id="sources-heading" class="pane-title">Sources</h2>
-      <p class="pane-hint">Cited pages appear here. Select a citation such as <span class="marker-sample">[1]</span> to jump to its card.</p>
+    <aside class="card sources-pane" aria-labelledby="sources-heading">
+      <div class="pane-head">
+        <h2 id="sources-heading" class="pane-title">Sources</h2>
+        <p class="pane-hint">Cited pages appear here. Select a citation such as <span class="marker-sample">[1]</span> to jump to its card.</p>
+      </div>
       <div id="sources" class="sources">
         <p class="empty-state muted" id="sources-empty">No sources yet.</p>
       </div>
