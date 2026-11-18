@@ -11,6 +11,9 @@
   var sources = document.getElementById("sources");
   var emptyState = document.getElementById("empty-state");
   var busy = false;
+  var locked = false;
+  var lockTimer = null;
+  var lockDeadline = 0;
 
   function setStatus(message, state) {
     status.textContent = message;
@@ -75,21 +78,135 @@
     return detailText(payload) || "This demo is rate limited.";
   }
 
+  function setQuotaText(text, modifier) {
+    if (!quota) {
+      return;
+    }
+    quota.classList.remove("quota--low", "quota--locked");
+    if (modifier) {
+      quota.classList.add(modifier);
+    }
+    quota.textContent = text;
+    quota.hidden = false;
+  }
+
+  function clearQuota() {
+    if (!quota) {
+      return;
+    }
+    quota.classList.remove("quota--low", "quota--locked");
+    quota.textContent = "";
+    quota.hidden = true;
+  }
+
+  function unlock() {
+    locked = false;
+    if (lockTimer !== null) {
+      clearInterval(lockTimer);
+      lockTimer = null;
+    }
+    lockDeadline = 0;
+    input.disabled = false;
+    send.disabled = false;
+    send.textContent = busy ? "Thinking…" : "Ask";
+    setQuotaText("Your questions are available again", null);
+  }
+
+  function updateLockedCountdown() {
+    if (!locked) {
+      return;
+    }
+    var remainingMs = lockDeadline - Date.now();
+    if (remainingMs <= 0) {
+      unlock();
+      return;
+    }
+    var minutes = Math.max(1, Math.ceil(remainingMs / 60000));
+    setQuotaText("Next question available in " + minutes + " min", "quota--locked");
+  }
+
+  function lockForSeconds(seconds) {
+    var safeSeconds =
+      typeof seconds === "number" && isFinite(seconds) ? Math.max(0, seconds) : 0;
+    locked = true;
+    if (lockTimer !== null) {
+      clearInterval(lockTimer);
+      lockTimer = null;
+    }
+    lockDeadline = Date.now() + safeSeconds * 1000;
+    input.disabled = true;
+    send.disabled = true;
+    updateLockedCountdown();
+    if (locked) {
+      lockTimer = window.setInterval(updateLockedCountdown, 30000);
+    }
+  }
+
+  function lockForTheDay() {
+    locked = true;
+    if (lockTimer !== null) {
+      clearInterval(lockTimer);
+      lockTimer = null;
+    }
+    lockDeadline = 0;
+    input.disabled = true;
+    send.disabled = true;
+    setQuotaText(
+      "The demo's daily limit has been reached. Try again tomorrow.",
+      "quota--locked"
+    );
+  }
+
+  function handleRateLimit(payload) {
+    var detail = payload && payload.detail;
+    if (!detail || typeof detail !== "object") {
+      return;
+    }
+    if (detail.reason === "daily") {
+      lockForTheDay();
+      return;
+    }
+    if (typeof detail.resets_in_seconds === "number") {
+      lockForSeconds(detail.resets_in_seconds);
+    }
+  }
+
   function renderQuota(payload) {
     if (!quota) {
       return;
     }
     if (typeof payload.limit !== "number") {
-      quota.hidden = true;
-      quota.textContent = "";
+      clearQuota();
       return;
     }
     var remaining = typeof payload.remaining === "number" ? payload.remaining : 0;
+    if (remaining <= 0) {
+      if (typeof payload.resets_in_seconds === "number") {
+        lockForSeconds(payload.resets_in_seconds);
+      } else {
+        // No reset hint: wait for the top of the hour window to roll over.
+        var now = new Date();
+        var nextHour = new Date(now.getTime());
+        nextHour.setMinutes(0, 0, 0);
+        nextHour.setHours(nextHour.getHours() + 1);
+        lockForSeconds(Math.max(1, Math.ceil((nextHour - now) / 1000)));
+      }
+      return;
+    }
+    if (remaining <= 2) {
+      setQuotaText(
+        "Only " + remaining + (remaining === 1 ? " question" : " questions") +
+          " left this hour",
+        "quota--low"
+      );
+      return;
+    }
     // "1 of 8 questions left": the noun agrees with the limit, not the remainder.
     var noun = payload.limit === 1 ? "question" : "questions";
-    quota.textContent =
-      remaining + " of " + payload.limit + " " + noun + " left this hour";
-    quota.hidden = false;
+    setQuotaText(
+      remaining + " of " + payload.limit + " " + noun + " left this hour",
+      null
+    );
   }
 
   function addMessage(role, text) {
@@ -106,7 +223,8 @@
 
   function setBusy(value) {
     busy = value;
-    send.disabled = value;
+    send.disabled = value || locked;
+    input.disabled = locked;
     send.textContent = value ? "Thinking…" : "Ask";
   }
 
@@ -253,6 +371,7 @@
       .then(function (result) {
         if (!result.response.ok) {
           if (result.response.status === 429) {
+            handleRateLimit(result.payload);
             throw new Error(rateLimitMessage(result.payload));
           }
           var detail = detailText(result.payload);
@@ -288,7 +407,7 @@
     if (event) {
       event.preventDefault();
     }
-    if (busy) {
+    if (busy || locked) {
       return;
     }
 
