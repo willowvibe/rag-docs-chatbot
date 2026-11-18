@@ -9,5 +9,8 @@ __pycache__/
 .env
 .demo-work/
 
+# Demo recording and assembly output
+video-work/
+
 # Scratch space (progress ledgers etc.)
 .superpowers/
