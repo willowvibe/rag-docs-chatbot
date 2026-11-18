@@ -13,6 +13,7 @@
   --danger: #f87171;
   --danger-soft: rgba(248, 113, 113, 0.12);
   --success: #34d399;
+  --warning: #fbbf24;
   --radius: 14px;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -292,6 +293,16 @@ textarea:focus {
 
 .quota[hidden] {
   display: none;
+}
+
+.quota--low {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.quota--locked {
+  color: #fcd34d;
+  font-weight: 600;
 }
 
 .status[data-state="busy"] {
