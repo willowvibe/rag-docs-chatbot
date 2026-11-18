@@ -82,9 +82,9 @@ therefore degrades to an uncited claim, not an error.
   Rate limiting is off by default (`RATE_LIMIT_ENABLED=0`).
 - **Hosted demo (owner key).** The owner's key lives in the server environment and is never
   sent to the browser. The demo sets `RATE_LIMIT_ENABLED=1`, backed by counters in a
-  `rate_counters` table in the same Postgres, with a per-IP hourly limit
-  (`PER_IP_PER_HOUR`) and a daily cap (`DAILY_CAP`). IPs are stored only as truncated
-  SHA-256 hashes.
+  `rate_counters` table and per-IP hits in a `rate_events` table in the same Postgres,
+  with a rolling 60-minute per-IP limit (`PER_IP_PER_HOUR`) and a daily cap (`DAILY_CAP`).
+  IPs are stored only as truncated SHA-256 hashes.
 
 ## Not implemented
 

@@ -260,11 +260,11 @@ def test_chat_success_reports_the_per_ip_limit(monkeypatch):
             per_ip_per_hour=8,
         ),
     )
-    monkeypatch.setattr(api, "check_and_consume", lambda ip: (True, 7, None))
+    monkeypatch.setattr(api, "check_and_consume", lambda ip: (True, 7, None, 1234))
     body = client.post("/api/chat", json={"question": "q"}).json()
     assert body["limit"] == 8
     assert body["remaining"] == 7
-    assert 0 < body["resets_in_seconds"] <= 3600
+    assert body["resets_in_seconds"] == 1234
 
 
 def test_chat_success_hides_the_limit_when_disabled(monkeypatch):
@@ -279,7 +279,7 @@ def test_chat_success_hides_the_limit_when_disabled(monkeypatch):
             rate_limit_enabled=False,
         ),
     )
-    monkeypatch.setattr(api, "check_and_consume", lambda ip: (True, -1, None))
+    monkeypatch.setattr(api, "check_and_consume", lambda ip: (True, -1, None, 0))
     body = client.post("/api/chat", json={"question": "q"}).json()
     assert body["limit"] is None
     assert body["remaining"] == -1
@@ -299,14 +299,16 @@ def test_chat_returns_the_per_ip_limit_when_blocked(monkeypatch):
             per_ip_per_hour=8,
         ),
     )
-    monkeypatch.setattr(api, "check_and_consume", lambda ip: (False, 0, "per_ip"))
+    monkeypatch.setattr(
+        api, "check_and_consume", lambda ip: (False, 0, "per_ip", 90)
+    )
     response = client.post("/api/chat", json={"question": "q"})
     assert response.status_code == 429
     detail = response.json()["detail"]
     assert detail["reason"] == "per_ip"
     assert detail["limit"] == 8
     assert detail["message"]
-    assert 0 < detail["resets_in_seconds"] <= 3600
+    assert detail["resets_in_seconds"] == 90
 
 
 def test_chat_returns_the_daily_limit_when_blocked(monkeypatch):
@@ -322,14 +324,16 @@ def test_chat_returns_the_daily_limit_when_blocked(monkeypatch):
             per_ip_per_hour=8,
         ),
     )
-    monkeypatch.setattr(api, "check_and_consume", lambda ip: (False, 0, "daily"))
+    monkeypatch.setattr(
+        api, "check_and_consume", lambda ip: (False, 0, "daily", 4321)
+    )
     response = client.post("/api/chat", json={"question": "q"})
     assert response.status_code == 429
     detail = response.json()["detail"]
     assert detail["reason"] == "daily"
     assert detail["limit"] == 8
     assert detail["message"]
-    assert 0 < detail["resets_in_seconds"] <= 86400
+    assert detail["resets_in_seconds"] == 4321
 
 
 def test_chat_rejects_out_of_range_k(monkeypatch):

@@ -38,6 +38,12 @@ CREATE TABLE IF NOT EXISTS rate_counters (
 );
 CREATE INDEX IF NOT EXISTS rate_counters_expires_at
     ON rate_counters (expires_at);
+CREATE TABLE IF NOT EXISTS rate_events (
+    ip_hash TEXT NOT NULL,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rate_events_ip_hash_at
+    ON rate_events (ip_hash, at);
 """
 
 _HYBRID_SEARCH = """

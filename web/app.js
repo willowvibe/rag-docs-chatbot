@@ -181,7 +181,7 @@
         return (
           "You've used all " +
           detail.limit +
-          " questions this hour. Try again in " +
+          " questions in the last hour. Try again in " +
           minutes +
           " min."
         );
@@ -305,7 +305,7 @@
       if (typeof payload.resets_in_seconds === "number") {
         lockForSeconds(payload.resets_in_seconds);
       } else {
-        // No reset hint: wait for the top of the hour window to roll over.
+        // No reset hint: wait for the rolling window to free a slot.
         var now = new Date();
         var nextHour = new Date(now.getTime());
         nextHour.setMinutes(0, 0, 0);
@@ -317,7 +317,7 @@
     if (remaining <= 2) {
       setQuotaText(
         "Only " + remaining + (remaining === 1 ? " question" : " questions") +
-          " left this hour",
+          " left in this rolling hour",
         "quota--low"
       );
       return;
@@ -325,7 +325,7 @@
     // "1 of 8 questions left": the noun agrees with the limit, not the remainder.
     var noun = payload.limit === 1 ? "question" : "questions";
     setQuotaText(
-      remaining + " of " + payload.limit + " " + noun + " left this hour",
+      remaining + " of " + payload.limit + " " + noun + " left (rolling hour)",
       null
     );
   }
