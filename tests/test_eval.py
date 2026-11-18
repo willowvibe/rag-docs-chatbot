@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import psycopg
 import pytest
 
+import ragchat.eval.run_eval as run_eval_module
 from ragchat.eval.run_eval import (
     INGEST_HINT,
     JUDGE_SYSTEM,
@@ -443,6 +444,64 @@ def test_run_eval_excludes_unparsed_judge_scores(tmp_path):
     assert results["faithfulness"] == 1.0
     assert results["judge_unparsed"] == 1
     assert results["per_question"][1]["faithfulness"] is None
+
+
+# --- call pacing ---------------------------------------------------------------
+
+def test_run_eval_paces_consecutive_llm_calls(tmp_path, monkeypatch):
+    golden = _write_golden(tmp_path, [_item("q1"), _item("q2")])
+    store = _FakeStore([[_hit()], [_hit()]])
+
+    clock = [100.0]
+    sleeps = []
+    call_starts = []
+
+    def fake_monotonic():
+        return clock[0]
+
+    def fake_sleep(seconds):
+        sleeps.append(seconds)
+        clock[0] += seconds
+
+    monkeypatch.setenv("EVAL_MIN_INTERVAL_SECONDS", "3.2")
+    monkeypatch.setattr(run_eval_module.time, "monotonic", fake_monotonic)
+    monkeypatch.setattr(run_eval_module.time, "sleep", fake_sleep)
+
+    class _TimedClient(_FakeClient):
+        def create(self, **kwargs):
+            call_starts.append(clock[0])
+            clock[0] += 0.5
+            return super().create(**kwargs)
+
+    client = _TimedClient(
+        answers=["Answer [1].", "Answer [1]."],
+        judges=["SCORE 3 supported", "SCORE 3 supported"],
+    )
+
+    run_eval(golden, store, _FakeEmbedder(), client, "m", k=5)
+
+    assert len(call_starts) == 4
+    gaps = [later - earlier for earlier, later in zip(call_starts, call_starts[1:])]
+    assert gaps == pytest.approx([3.2, 3.2, 3.2])
+    assert sleeps == pytest.approx([2.7, 2.7, 2.7])
+
+
+def test_run_eval_zero_interval_does_not_sleep(tmp_path, monkeypatch):
+    golden = _write_golden(tmp_path, [_item("q1"), _item("q2")])
+    store = _FakeStore([[_hit()], [_hit()]])
+    sleeps = []
+    monkeypatch.setenv("EVAL_MIN_INTERVAL_SECONDS", "0")
+    monkeypatch.setattr(
+        run_eval_module.time, "sleep", lambda seconds: sleeps.append(seconds)
+    )
+    client = _FakeClient(
+        answers=["Answer [1].", "Answer [1]."],
+        judges=["SCORE 3 supported", "SCORE 3 supported"],
+    )
+
+    run_eval(golden, store, _FakeEmbedder(), client, "m", k=5)
+
+    assert sleeps == []
 
 
 # --- markdown ------------------------------------------------------------------

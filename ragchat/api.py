@@ -142,6 +142,16 @@ def health() -> dict:
     return {"status": "ok", "chunks": _store().count()}
 
 
+@app.get("/api/info")
+def info() -> dict:
+    settings = _settings()
+    return {
+        "model": settings.model,
+        "provider": settings.llm_provider,
+        "free": settings.model.endswith(":free"),
+    }
+
+
 @app.get("/api/documents")
 def documents() -> dict:
     return _documents_payload()

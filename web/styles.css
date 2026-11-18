@@ -138,6 +138,16 @@ h1 {
   font-size: 0.88rem;
 }
 
+.powered-by {
+  margin: -2px 0 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.powered-by[hidden] {
+  display: none;
+}
+
 .marker-sample {
   padding: 1px 5px;
   border: 1px solid rgba(14, 165, 233, 0.4);
@@ -329,6 +339,14 @@ a.document-title:focus-visible {
   border: 1px solid var(--border);
   border-bottom-left-radius: 4px;
   line-height: 1.68;
+}
+
+.answer-meta {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.4;
 }
 
 .message.error {

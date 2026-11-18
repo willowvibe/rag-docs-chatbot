@@ -217,6 +217,21 @@ def test_make_client_returns_anthropic_when_selected():
     assert isinstance(client, anthropic.Anthropic)
 
 
+def test_make_client_returns_openrouter_when_selected():
+    settings = SimpleNamespace(
+        llm_provider="openrouter",
+        ollama_api_key="k",
+        ollama_host="https://ollama.com",
+        anthropic_api_key="a",
+        openrouter_api_key="or-key",
+    )
+
+    client = make_client(settings)
+
+    assert isinstance(client, OpenRouterClient)
+    assert client.api_key == "or-key"
+
+
 def test_openrouter_create_posts_the_openai_style_request():
     captured = {}
 

@@ -79,6 +79,52 @@ def test_anthropic_provider_uses_claude_defaults(monkeypatch):
     assert s.llm_key_env == "ANTHROPIC_API_KEY"
 
 
+def test_openrouter_provider_uses_the_free_ling_defaults(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    monkeypatch.delenv("RAG_MODEL", raising=False)
+    monkeypatch.delenv("RAG_CHEAP_MODEL", raising=False)
+    monkeypatch.delenv("RAG_FALLBACK_MODEL", raising=False)
+    monkeypatch.delenv("RAG_FALLBACK_MODELS", raising=False)
+    s = load_settings()
+    assert s.llm_provider == "openrouter"
+    assert s.model == "inclusionai/ling-3.2-flash:free"
+    assert s.cheap_model == "inclusionai/ling-3.2-flash:free"
+    assert s.llm_key_env == "OPENROUTER_API_KEY"
+
+
+def test_openrouter_provider_reads_the_openrouter_key(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    s = load_settings()
+    assert s.llm_api_key == "openrouter-key"
+
+
+def test_openrouter_default_fallback_chain(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    monkeypatch.delenv("RAG_FALLBACK_MODELS", raising=False)
+    monkeypatch.delenv("RAG_FALLBACK_MODEL", raising=False)
+
+    assert load_settings().fallback_chain == [
+        ("openrouter", "nvidia/nemotron-3.5-super-vl:free"),
+        ("ollama", "glm-5.3-flash"),
+    ]
+
+
+def test_openrouter_default_chain_drops_ollama_without_a_key(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    monkeypatch.delenv("RAG_FALLBACK_MODELS", raising=False)
+    monkeypatch.delenv("RAG_FALLBACK_MODEL", raising=False)
+
+    assert load_settings().fallback_chain == [
+        ("openrouter", "nvidia/nemotron-3.5-super-vl:free")
+    ]
+
+
 def test_fallback_chain_splits_on_the_first_colon(monkeypatch):
     monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")

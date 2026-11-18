@@ -1,6 +1,6 @@
 # Retrieval and faithfulness eval
 
-Corpus: 386 chunks across the golden files (nist-sp-800-63-4.pdf: 155; nist-sp-800-63b.pdf: 231) · k = 5 · retrieval: vector · reranker: none · answer model: `glm-5.3-flash` · questions: 40
+Corpus: 386 chunks across the golden files (nist-sp-800-63-4.pdf: 155; nist-sp-800-63b.pdf: 231) · k = 5 · retrieval: vector · reranker: none · answer model: `inclusionai/ling-3.2-flash:free` · questions: 40
 
 | Metric | Value | Basis |
 |---|---|---|
@@ -21,7 +21,7 @@ Evidence metrics count any retrieved or cited passage that contains the question
 |---|---|---|---|---|---|---|---|
 | q01 | yes | 2 | yes | 1.00 | yes | 2 | yes |
 | q02 | yes | 1 | yes | 1.00 | yes | 1 | yes |
-| q03 | yes | 1 | yes | 1.00 | yes | 1 | yes |
+| q03 | yes | 1 | yes | 0.33 | yes | 1 | yes |
 | q04 | yes | 1 | yes | 1.00 | yes | 1 | yes |
 | q05 | yes | 1 | yes | 1.00 | yes | 1 | yes |
 | q06 | yes | 1 | yes | 1.00 | yes | 1 | yes |
@@ -55,9 +55,9 @@ Evidence metrics count any retrieved or cited passage that contains the question
 | q34 | yes | 1 | yes | 1.00 | yes | 1 | yes |
 | q35 | no | - | no | 1.00 | no | - | no |
 | q36 | yes | 2 | yes | 1.00 | yes | 2 | yes |
-| q37 | no | - | no | 0.00 | no | - | no |
-| q38 | no | - | no | 1.00 | no | - | no |
+| q37 | no | - | no | 1.00 | no | - | no |
+| q38 | no | - | no | 0.33 | no | - | no |
 | q39 | yes | 1 | yes | 1.00 | yes | 1 | yes |
 | q40 | yes | 1 | yes | 1.00 | yes | 1 | yes |
 
-Reproduce with `make eval` (needs `OLLAMA_API_KEY` (or `ANTHROPIC_API_KEY` with LLM_PROVIDER=anthropic) and an ingested corpus).
+Reproduce with `make eval` (needs `OLLAMA_API_KEY`, or `OPENROUTER_API_KEY` with LLM_PROVIDER=openrouter, or `ANTHROPIC_API_KEY` with LLM_PROVIDER=anthropic, plus an ingested corpus).
