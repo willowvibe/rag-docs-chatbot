@@ -1,8 +1,10 @@
-"""LLM clients: Ollama Cloud by default, Anthropic Claude optional."""
+"""LLM clients: Ollama Cloud by default, OpenRouter fallbacks, Anthropic optional."""
 
 from __future__ import annotations
 
 import httpx
+
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def _flatten_content(content) -> str:
@@ -34,7 +36,7 @@ class _Message:
 
 
 class _Messages:
-    def __init__(self, client: OllamaClient):
+    def __init__(self, client):
         self._client = client
 
     def create(self, model: str, max_tokens: int, temperature: float,
@@ -100,15 +102,78 @@ class OllamaClient:
         return _Message(content)
 
 
-def make_client(settings) -> OllamaClient:
-    if settings.llm_provider == "ollama":
+class OpenRouterClient:
+    """Duck-types the same Anthropic-style subset as OllamaClient."""
+
+    def __init__(self, api_key: str, timeout: float = 120):
+        self.api_key = api_key
+        self.timeout = timeout
+        self._http = httpx.Client(timeout=timeout)
+        self.messages = _Messages(self)
+
+    def _create(self, model: str, max_tokens: int, temperature: float,
+                system: str, messages: list[dict]) -> _Message:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system},
+                *[
+                    {
+                        "role": message["role"],
+                        "content": _flatten_content(message.get("content", "")),
+                    }
+                    for message in messages
+                ],
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            # Free reasoning models spend the whole token budget thinking and return
+            # empty content, so reasoning is always disabled here.
+            "reasoning": {"enabled": False},
+        }
+        try:
+            response = self._http.post(
+                OPENROUTER_URL,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "X-Title": "rag-docs-chatbot",
+                },
+                json=payload,
+            )
+        except httpx.HTTPError as exc:
+            raise RuntimeError(f"OpenRouter request failed: {exc}") from None
+        if not response.is_success:
+            excerpt = response.text[:200].strip()
+            raise RuntimeError(
+                f"OpenRouter request failed with status {response.status_code}: {excerpt}"
+            )
+        data = response.json()
+        choices = data.get("choices") or []
+        choice = choices[0] if choices else {}
+        content = _flatten_content((choice.get("message") or {}).get("content") or "")
+        if not content.strip():
+            finish_reason = choice.get("finish_reason")
+            raise RuntimeError(
+                f"empty completion from {model} (finish_reason={finish_reason})"
+            )
+        return _Message(content)
+
+
+def make_provider_client(settings, provider: str):
+    if provider == "ollama":
         return OllamaClient(
             settings.ollama_api_key,
             settings.ollama_host,
             think=getattr(settings, "llm_think", False),
         )
-    if settings.llm_provider == "anthropic":
+    if provider == "openrouter":
+        return OpenRouterClient(settings.openrouter_api_key)
+    if provider == "anthropic":
         import anthropic
 
         return anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    raise RuntimeError(f"unsupported LLM_PROVIDER: {settings.llm_provider!r}")
+    raise RuntimeError(f"unsupported LLM provider: {provider!r}")
+
+
+def make_client(settings):
+    return make_provider_client(settings, settings.llm_provider)

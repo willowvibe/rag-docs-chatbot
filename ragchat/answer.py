@@ -38,6 +38,7 @@ class Answer:
     text: str
     citations: list[Citation]
     used_hits: list[Hit]
+    model: str = ""
 
 
 def build_messages(question: str, hits: list[Hit]) -> list[dict]:
@@ -111,43 +112,49 @@ def answer(
     hits: list[Hit],
     client=None,
     model: str = "claude-sonnet-5-5",
-    fallback_model: str | None = None,
+    fallbacks: list[tuple[object, str]] | None = None,
 ) -> Answer:
     if not hits:
-        return Answer(text=REFUSAL, citations=[], used_hits=[])
+        return Answer(text=REFUSAL, citations=[], used_hits=[], model=model)
     if client is None:
         from ragchat.config import load_settings
-        from ragchat.llm import make_client
+        from ragchat.llm import make_client, make_provider_client
 
         settings = load_settings()
         client = make_client(settings)
-        if fallback_model is None:
-            fallback_model = settings.fallback_model
-    try:
-        response = client.messages.create(
-            model=model,
-            max_tokens=700,
-            temperature=0,
-            system=SYSTEM_PROMPT,
-            messages=build_messages(question, hits)[1:],
+        if fallbacks is None:
+            fallbacks = [
+                (make_provider_client(settings, provider), fallback_model)
+                for provider, fallback_model in settings.fallback_chain
+            ]
+    attempts = [(client, model), *(fallbacks or [])]
+    for index, (attempt_client, attempt_model) in enumerate(attempts):
+        try:
+            response = attempt_client.messages.create(
+                model=attempt_model,
+                max_tokens=700,
+                temperature=0,
+                system=SYSTEM_PROMPT,
+                messages=build_messages(question, hits)[1:],
+            )
+        except Exception as exc:
+            # Log the model and exception type only: provider messages can echo
+            # request details, and the key must never reach the logs.
+            logger.warning(
+                "Model %s failed with %s; trying the next model",
+                attempt_model,
+                type(exc).__name__,
+            )
+            if index == len(attempts) - 1:
+                raise
+            continue
+        text = "".join(block.text for block in response.content if block.type == "text").strip()
+        text = normalize_citation_markers(text)
+        text = resolve_source_only_markers(text, hits)
+        return Answer(
+            text=text,
+            citations=parse_citations(text, hits),
+            used_hits=hits,
+            model=attempt_model,
         )
-    except Exception as exc:
-        if not fallback_model or fallback_model == model:
-            raise
-        logger.warning(
-            "Primary model %s failed with %s; retrying once with fallback model %s",
-            model,
-            type(exc).__name__,
-            fallback_model,
-        )
-        response = client.messages.create(
-            model=fallback_model,
-            max_tokens=700,
-            temperature=0,
-            system=SYSTEM_PROMPT,
-            messages=build_messages(question, hits)[1:],
-        )
-    text = "".join(block.text for block in response.content if block.type == "text").strip()
-    text = normalize_citation_markers(text)
-    text = resolve_source_only_markers(text, hits)
-    return Answer(text=text, citations=parse_citations(text, hits), used_hits=hits)
+    raise AssertionError("unreachable")

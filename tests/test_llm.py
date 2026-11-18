@@ -4,11 +4,22 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from ragchat.llm import OllamaClient, make_client
+from ragchat.llm import (
+    OpenRouterClient,
+    OllamaClient,
+    make_client,
+    make_provider_client,
+)
 
 
 def _client(handler, api_key="secret-key", host="https://ollama.example/", think=False):
     client = OllamaClient(api_key, host, think=think)
+    client._http = httpx.Client(transport=httpx.MockTransport(handler))
+    return client
+
+
+def _openrouter_client(handler, api_key="secret-key"):
+    client = OpenRouterClient(api_key)
     client._http = httpx.Client(transport=httpx.MockTransport(handler))
     return client
 
@@ -204,3 +215,144 @@ def test_make_client_returns_anthropic_when_selected():
     client = make_client(settings)
 
     assert isinstance(client, anthropic.Anthropic)
+
+
+def test_openrouter_create_posts_the_openai_style_request():
+    captured = {}
+
+    def handler(request):
+        captured["url"] = str(request.url)
+        captured["authorization"] = request.headers["authorization"]
+        captured["title"] = request.headers["x-title"]
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {"message": {"content": "hello"}, "finish_reason": "stop"}
+                ]
+            },
+        )
+
+    client = _openrouter_client(handler)
+    result = client.messages.create(
+        model="inclusionai/ling-3.2-flash:free",
+        max_tokens=700,
+        temperature=0,
+        system="system rules",
+        messages=[{"role": "user", "content": "the question"}],
+    )
+
+    assert captured["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert captured["authorization"] == "Bearer secret-key"
+    assert captured["title"] == "rag-docs-chatbot"
+    assert captured["body"] == {
+        "model": "inclusionai/ling-3.2-flash:free",
+        "messages": [
+            {"role": "system", "content": "system rules"},
+            {"role": "user", "content": "the question"},
+        ],
+        "temperature": 0,
+        "max_tokens": 700,
+        "reasoning": {"enabled": False},
+    }
+    assert result.content[0].type == "text"
+    assert result.content[0].text == "hello"
+
+
+def test_openrouter_flattens_anthropic_style_content_blocks():
+    captured = {}
+
+    def handler(request):
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": "ok"}}]}
+        )
+
+    client = _openrouter_client(handler)
+    client.messages.create(
+        model="m",
+        max_tokens=10,
+        temperature=0,
+        system="s",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "first "},
+                    {"type": "text", "text": "second"},
+                ],
+            }
+        ],
+    )
+
+    assert captured["body"]["messages"][1] == {
+        "role": "user",
+        "content": "first second",
+    }
+
+
+def test_openrouter_non_200_raises_without_leaking_the_key():
+    def handler(request):
+        return httpx.Response(429, json={"error": "rate limited"})
+
+    client = _openrouter_client(handler, api_key="super-secret-key")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        client.messages.create(
+            model="m",
+            max_tokens=10,
+            temperature=0,
+            system="s",
+            messages=[{"role": "user", "content": "q"}],
+        )
+
+    message = str(exc_info.value)
+    assert "429" in message
+    assert "rate limited" in message
+    assert "super-secret-key" not in message
+
+
+def test_openrouter_empty_content_raises_with_the_model_and_finish_reason():
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {"message": {"content": "   "}, "finish_reason": "length"}
+                ]
+            },
+        )
+
+    client = _openrouter_client(handler, api_key="super-secret-key")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        client.messages.create(
+            model="some-free-model:free",
+            max_tokens=700,
+            temperature=0,
+            system="s",
+            messages=[{"role": "user", "content": "q"}],
+        )
+
+    message = str(exc_info.value)
+    assert "empty completion" in message
+    assert "some-free-model:free" in message
+    assert "finish_reason=length" in message
+    assert "super-secret-key" not in message
+
+
+def test_make_provider_client_returns_openrouter():
+    settings = SimpleNamespace(openrouter_api_key="or-key")
+
+    client = make_provider_client(settings, "openrouter")
+
+    assert isinstance(client, OpenRouterClient)
+    assert client.api_key == "or-key"
+
+
+def test_make_provider_client_rejects_an_unknown_provider():
+    settings = SimpleNamespace()
+
+    with pytest.raises(RuntimeError, match="unsupported LLM provider"):
+        make_provider_client(settings, "bogus")

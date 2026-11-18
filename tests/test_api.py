@@ -38,12 +38,13 @@ def _client(monkeypatch, reply="At least 8 characters [1]."):
     monkeypatch.setattr(
         api,
         "_answer",
-        lambda q, hits, model, fallback_model=None: Answer(
+        lambda q, hits, model, fallbacks=None: Answer(
             text=reply,
             citations=[
                 Citation(file="a.pdf", page=3, snippet="eight characters", marker=1)
             ],
             used_hits=hits,
+            model="model-that-answered",
         ),
     )
     return TestClient(api.app)
@@ -145,6 +146,7 @@ def test_documents_response_is_cached_for_the_store(monkeypatch, tmp_path):
 def test_chat_returns_answer_and_citations(monkeypatch):
     body = _client(monkeypatch).post("/api/chat", json={"question": "How long?"}).json()
     assert body["answer"] == "At least 8 characters [1]."
+    assert body["model"] == "model-that-answered"
     assert body["citations"][0]["page"] == 3
     assert body["citations"][0]["file"] == "a.pdf"
     assert body["citations"][0]["snippet"] == "eight characters"
@@ -181,7 +183,7 @@ def test_chat_with_rerank_searches_candidates_and_passes_reranked_top_k_to_answe
             reranked["top_k"] = top_k
             return list(reversed(candidates))[:top_k]
 
-    def fake_answer(question, selected, model, fallback_model=None):
+    def fake_answer(question, selected, model, fallbacks=None):
         answered["hits"] = list(selected)
         return Answer(text="ok", citations=[], used_hits=selected)
 
@@ -387,12 +389,15 @@ def test_answer_seam_receives_the_made_client(monkeypatch):
     sentinel = object()
     captured = {}
 
-    def fake_answer(question, hits, client=None, model=None, fallback_model=None):
+    def fake_answer(question, hits, client=None, model=None, fallbacks=None):
         captured["client"] = client
         return Answer(text="ok", citations=[], used_hits=hits)
 
-    monkeypatch.setattr(api, "make_client", lambda settings: sentinel)
+    monkeypatch.setattr(
+        api, "make_provider_client", lambda settings, provider: sentinel
+    )
     monkeypatch.setattr(api, "answer_fn", fake_answer)
+    monkeypatch.setattr(api, "_CLIENTS", {})
 
     api._answer("q", [], "m")
 

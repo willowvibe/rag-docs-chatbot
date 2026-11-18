@@ -16,11 +16,13 @@ def test_defaults(monkeypatch):
         "OLLAMA_API_KEY",
         "OLLAMA_HOST",
         "ANTHROPIC_API_KEY",
+        "OPENROUTER_API_KEY",
         "RATE_LIMIT_ENABLED",
         "RAG_TOP_K",
         "RAG_MODEL",
         "RAG_CHEAP_MODEL",
         "RAG_FALLBACK_MODEL",
+        "RAG_FALLBACK_MODELS",
         "RAG_THINK",
         "RAG_RERANK",
         "RAG_RERANK_MODEL",
@@ -41,12 +43,26 @@ def test_defaults(monkeypatch):
     assert s.llm_provider == "ollama"
     assert s.ollama_api_key == ""
     assert s.ollama_host == "https://ollama.com"
+    assert s.openrouter_api_key == ""
     assert s.model == "glm-5.3-flash"
     assert s.cheap_model == "glm-5.3-flash"
-    assert s.fallback_model == "deepseek-v4.1-flash:1017"
+    assert s.fallback_chain == []
     assert s.llm_think is False
     assert s.llm_api_key == ""
     assert s.llm_key_env == "OLLAMA_API_KEY"
+
+
+def test_default_fallback_chain_when_both_keys_are_present(monkeypatch):
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.delenv("RAG_FALLBACK_MODELS", raising=False)
+    monkeypatch.delenv("RAG_FALLBACK_MODEL", raising=False)
+
+    assert load_settings().fallback_chain == [
+        ("ollama", "deepseek-v4.1-flash:1017"),
+        ("openrouter", "inclusionai/ling-3.2-flash:free"),
+        ("openrouter", "nvidia/nemotron-3.5-super-vl:free"),
+    ]
 
 
 def test_anthropic_provider_uses_claude_defaults(monkeypatch):
@@ -54,17 +70,36 @@ def test_anthropic_provider_uses_claude_defaults(monkeypatch):
     monkeypatch.delenv("RAG_MODEL", raising=False)
     monkeypatch.delenv("RAG_CHEAP_MODEL", raising=False)
     monkeypatch.delenv("RAG_FALLBACK_MODEL", raising=False)
+    monkeypatch.delenv("RAG_FALLBACK_MODELS", raising=False)
     s = load_settings()
     assert s.llm_provider == "anthropic"
     assert s.model == "claude-sonnet-5-5"
     assert s.cheap_model == "claude-haiku-5-5"
-    assert s.fallback_model == ""
+    assert s.fallback_chain == []
     assert s.llm_key_env == "ANTHROPIC_API_KEY"
 
 
-def test_fallback_model_env_override(monkeypatch):
+def test_fallback_chain_splits_on_the_first_colon(monkeypatch):
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.setenv(
+        "RAG_FALLBACK_MODELS",
+        "ollama:deepseek-v4.1-flash:1017,"
+        "openrouter:inclusionai/ling-3.2-flash:free",
+    )
+
+    assert load_settings().fallback_chain == [
+        ("ollama", "deepseek-v4.1-flash:1017"),
+        ("openrouter", "inclusionai/ling-3.2-flash:free"),
+    ]
+
+
+def test_legacy_fallback_model_uses_the_active_provider(monkeypatch):
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    monkeypatch.delenv("RAG_FALLBACK_MODELS", raising=False)
     monkeypatch.setenv("RAG_FALLBACK_MODEL", "backup-model:1")
-    assert load_settings().fallback_model == "backup-model:1"
+
+    assert load_settings().fallback_chain == [("ollama", "backup-model:1")]
 
 
 def test_think_env_override(monkeypatch):
@@ -73,9 +108,47 @@ def test_think_env_override(monkeypatch):
 
 
 @pytest.mark.parametrize("value", ["none", "NONE", "off", "OFF"])
-def test_fallback_model_can_be_disabled(monkeypatch, value):
+def test_fallback_chain_can_be_disabled(monkeypatch, value):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.setenv("RAG_FALLBACK_MODELS", value)
+    assert load_settings().fallback_chain == []
+
+
+@pytest.mark.parametrize("value", ["none", "NONE", "off", "OFF"])
+def test_legacy_fallback_model_can_be_disabled(monkeypatch, value):
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    monkeypatch.delenv("RAG_FALLBACK_MODELS", raising=False)
     monkeypatch.setenv("RAG_FALLBACK_MODEL", value)
-    assert load_settings().fallback_model == ""
+    assert load_settings().fallback_chain == []
+
+
+def test_fallback_entries_without_a_key_are_dropped(monkeypatch):
+    monkeypatch.setenv(
+        "RAG_FALLBACK_MODELS",
+        "ollama:deepseek-v4.1-flash:1017,"
+        "openrouter:inclusionai/ling-3.2-flash:free",
+    )
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    assert load_settings().fallback_chain == []
+
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    assert load_settings().fallback_chain == [
+        ("ollama", "deepseek-v4.1-flash:1017")
+    ]
+
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    assert load_settings().fallback_chain == [
+        ("openrouter", "inclusionai/ling-3.2-flash:free")
+    ]
+
+
+def test_unknown_fallback_provider_raises(monkeypatch):
+    monkeypatch.setenv("RAG_FALLBACK_MODELS", "openai:gpt-4o")
+
+    with pytest.raises(ValueError, match="unknown fallback provider"):
+        load_settings()
 
 
 def test_llm_key_follows_the_active_provider(monkeypatch):

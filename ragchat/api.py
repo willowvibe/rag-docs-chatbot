@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from ragchat.answer import answer as answer_fn
 from ragchat.config import load_settings
 from ragchat.embeddings import Embedder
-from ragchat.llm import make_client
+from ragchat.llm import make_provider_client
 from ragchat.ratelimit import check_and_consume
 from ragchat.rerank import Reranker
 from ragchat.store import Store
@@ -30,10 +30,19 @@ _STORE: Store | None = None
 _EMBEDDER: Embedder | None = None
 _RERANKER: Reranker | None = None
 _DOCUMENTS_CACHE: tuple[Store, dict] | None = None
+_CLIENTS: dict[str, object] = {}
 
 
 def _settings():
     return load_settings()
+
+
+def _provider_client(provider: str, settings=None):
+    client = _CLIENTS.get(provider)
+    if client is None:
+        client = make_provider_client(settings or _settings(), provider)
+        _CLIENTS[provider] = client
+    return client
 
 
 def _store() -> Store:
@@ -57,13 +66,21 @@ def _reranker() -> Reranker:
     return _RERANKER
 
 
-def _answer(question: str, hits, model: str, fallback_model: str | None = None):
+def _fallback_clients(settings) -> list[tuple[object, str]]:
+    return [
+        (_provider_client(provider, settings), fallback_model)
+        for provider, fallback_model in settings.fallback_chain
+    ]
+
+
+def _answer(question: str, hits, model: str, fallbacks=None):
+    settings = _settings()
     return answer_fn(
         question,
         hits,
-        client=make_client(_settings()),
+        client=_provider_client(settings.llm_provider, settings),
         model=model,
-        fallback_model=fallback_model,
+        fallbacks=fallbacks,
     )
 
 
@@ -181,14 +198,14 @@ def chat(body: ChatRequest, request: Request) -> dict:
         hits = _store().search(
             vector, k=k, query=question, hybrid=settings.hybrid_enabled
         )
-    result = _answer(question, hits, settings.model, settings.fallback_model)
+    result = _answer(question, hits, settings.model, _fallback_clients(settings))
     return {
         "answer": result.text,
         "citations": [
             {"file": c.file, "page": c.page, "snippet": c.snippet, "marker": c.marker}
             for c in result.citations
         ],
-        "model": settings.model,
+        "model": result.model,
         "limit": settings.per_ip_per_hour if settings.rate_limit_enabled else None,
         "remaining": remaining,
         "resets_in_seconds": retry_after if settings.rate_limit_enabled else None,
