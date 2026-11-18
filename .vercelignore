@@ -10,6 +10,15 @@
 /docs
 /.github
 
+# Local-only working directories that a CLI deploy from a working copy would upload.
+# /.demo-work holds demo.env, which contains the Neon password.
+/.demo-work
+/.cheapag
+/.cheapag-plan.md
+/video-work
+/site
+/scripts
+
 # Local caches, kept explicit. Vercel's built-in ignore list already drops `__pycache__`
 # at any depth and `.venv`; only `/.pytest_cache`, `/.ruff_cache` and stray root `/*.pyc`
 # add coverage here.
