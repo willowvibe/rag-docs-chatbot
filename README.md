@@ -17,6 +17,8 @@ the retrieval pipeline ships with an eval harness so the numbers can be regenera
 a fresh clone. Optionally, cross-encoder reranking retrieves N candidates and reorders
 them down to the top-k passages used for the answer.
 
+Built and maintained by [WillowVibe](https://www.willowvibe.com). Need cited answers over your own documents? See our [AI on your data pilot](https://www.willowvibe.com/services/ai-on-your-data).
+
 **Status:** pre-release. What works today: PDF, Markdown and HTML ingestion; local BGE
 embeddings; pgvector storage and cosine search; LLM answers via Ollama Cloud, OpenRouter,
 or Anthropic (configurable model) grounded in retrieved passages with `[n]` citations and
@@ -248,3 +250,7 @@ tests/         pytest suite
 
 MIT — see `LICENSE`. The corpus documents are U.S. Government works in the public domain
 (see `corpus/LICENSE.corpus.txt`).
+
+## About
+
+rag-docs-chatbot is an open-source project by [WillowVibe](https://www.willowvibe.com), a small data engineering and AI studio. Questions or project ideas: contact@willowvibe.com or [book a 30-minute call](https://cal.com/harishng/30min).
